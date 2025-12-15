@@ -2,15 +2,17 @@ import { configureStore, combineReducers } from '@reduxjs/toolkit';
 import { persistStore, persistReducer, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import chatReducer from './slices/chatSlice';
+import taskReducer from './slices/taskSlice';
 
 const rootReducer = combineReducers({
   chat: chatReducer,
+  tasks: taskReducer,
 });
 
 const persistConfig = {
   key: 'root',
   storage: AsyncStorage,
-  whitelist: ['chat'], // persist chat slice
+  whitelist: ['chat', 'tasks'], // persist chat and tasks
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

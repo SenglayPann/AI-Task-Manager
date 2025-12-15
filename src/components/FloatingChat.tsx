@@ -17,6 +17,7 @@ import { useChat } from '../hooks/useChat';
 import { AIChatMessage, ITask } from '../types/task';
 import { useTasks } from '../context/TaskContext';
 import { glassStyles } from './GlassLayout';
+import * as NavigationService from '../services/NavigationService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CHAT_WIDTH = SCREEN_WIDTH * 0.9;
@@ -100,7 +101,64 @@ export const FloatingChat: React.FC<FloatingChatProps> = () => {
         >
           {item.text}
         </Text>
+
+        {item.relatedTask && (
+          <View style={styles.taskCard}>
+            <View style={styles.taskCardHeader}>
+              <Text style={styles.taskCardTitle}>{item.relatedTask.title}</Text>
+              <View
+                style={[
+                  styles.statusBadge,
+                  {
+                    backgroundColor: item.relatedTask.isCompleted
+                      ? '#E5F9E7'
+                      : '#FFF4E5',
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.statusText,
+                    {
+                      color: item.relatedTask.isCompleted
+                        ? '#269236'
+                        : '#FF9500',
+                    },
+                  ]}
+                >
+                  {item.relatedTask.isCompleted ? 'Completed' : 'Pending'}
+                </Text>
+              </View>
+            </View>
+
+            {item.relatedTask.description && (
+              <Text style={styles.taskCardDescription} numberOfLines={2}>
+                {item.relatedTask.description}
+              </Text>
+            )}
+
+            <View style={styles.taskCardFooter}>
+              {item.relatedTask.dueDate && (
+                <Text style={styles.taskCardDate}>
+                  📅 {new Date(item.relatedTask.dueDate).toLocaleDateString()}
+                </Text>
+              )}
+
+              <TouchableOpacity
+                style={styles.viewDetailsButton}
+                onPress={() =>
+                  NavigationService.navigate('TaskDetail', {
+                    task: item.relatedTask,
+                  })
+                }
+              >
+                <Text style={styles.viewDetailsText}>View Details →</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </View>
+
       {item.suggestions && item.suggestions.length > 0 && (
         <View style={styles.suggestionsContainer}>
           {item.suggestions.map((suggestion, index) => (
@@ -447,5 +505,71 @@ const styles = StyleSheet.create({
   deleteHistoryText: {
     fontSize: 20,
     color: '#ff3b30',
+  },
+  taskCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 15,
+    marginTop: 10,
+    marginLeft: 5,
+    maxWidth: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  taskCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  taskCardTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    flex: 1,
+    marginRight: 10,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  taskCardDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  taskCardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  taskCardDate: {
+    fontSize: 12,
+    color: '#888',
+  },
+  viewDetailsButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+  },
+  viewDetailsText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

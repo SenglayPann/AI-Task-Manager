@@ -13,6 +13,7 @@ export interface AIChatMessage {
   text: string;
   createdAt: number;
   suggestions?: string[];
+  relatedTask?: ITask;
 }
 
 export type AIChatAction = 

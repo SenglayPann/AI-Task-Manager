@@ -93,7 +93,8 @@ export const useChat = (tasks: ITask[], addTask: any, deleteTask: any, toggleCom
          sessionId: currentSessionId, 
          messageId: streamingMsgId, 
          text: response.text,
-         suggestions: response.suggestions
+         suggestions: response.suggestions,
+         relatedTask: response.relatedTask
        }));
 
       if (response.action) {

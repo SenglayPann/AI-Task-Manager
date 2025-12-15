@@ -10,6 +10,7 @@ import { View, StyleSheet } from 'react-native';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { store, persistor } from './src/store/store';
+import { navigationRef } from './src/services/NavigationService';
 
 const Stack = createNativeStackNavigator();
 
@@ -19,7 +20,7 @@ const App = () => {
       <PersistGate loading={null} persistor={persistor}>
         <TaskProvider>
           <View style={styles.container}>
-            <NavigationContainer>
+            <NavigationContainer ref={navigationRef}>
               <Stack.Navigator initialRouteName="Dashboard">
                 <Stack.Screen
                   name="Dashboard"
