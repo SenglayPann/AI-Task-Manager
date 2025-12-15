@@ -48,8 +48,10 @@ You MUST ALWAYS respond with a valid JSON object. Do not include markdown format
 Structure:
 {
   "text": "Your response message to the user",
+  "text": "Your response message to the user",
   "suggestions": ["Option 1", "Option 2"], // Optional: suggestions for the user
   "relatedTask": { ... }, // Optional: The simplified task object if discussing a SPECIFIC existing task.
+  "relatedTasks": [{ ... }, { ... }], // Optional: A list of simplified task objects if discussing LIST of tasks.
   "action": { ... } // Optional: the action to perform
 }
 
@@ -62,7 +64,8 @@ Action Objects:
 
 Important: 
 - Always use full ISO 8601 datetime format for dueDate (with time), not just date.
-- If the user asks about a specific task or updates a specific task, include the FULL task object in the "relatedTask" field so the UI can display a card.
+- If the user asks about a specific task or updates a specific task, include the FULL task object in the "relatedTask" field.
+- If the user asks about a LIST of tasks (e.g. "my tasks", "pending tasks"), include the relevant tasks in "relatedTasks".
 `;
 
 export const GeminiService = {
@@ -70,7 +73,7 @@ export const GeminiService = {
     userMessage: string, 
     currentTasks: ITask[], 
     chatHistory: AIChatMessage[] = []
-  ): Promise<{ text: string; action?: AIChatAction; suggestions?: string[]; relatedTask?: ITask }> => {
+  ): Promise<{ text: string; action?: AIChatAction; suggestions?: string[]; relatedTask?: ITask; relatedTasks?: ITask[] }> => {
     let attempts = 0;
     // We try up to API_KEYS.length + 1 times to ensure we cycle back to the first key if needed
     const maxAttempts = API_KEYS.length + 1;
@@ -111,7 +114,8 @@ User Message: ${userMessage}
             text: parsed.text || 'I processed your request.',
             action: parsed.action,
             suggestions: parsed.suggestions,
-            relatedTask: parsed.relatedTask
+            relatedTask: parsed.relatedTask,
+            relatedTasks: parsed.relatedTasks
           };
         } catch (e) {
           console.error('Failed to parse Gemini JSON:', e);
@@ -202,7 +206,7 @@ You MUST respond with a valid JSON object.
     currentTasks: ITask[],
     chatHistory: AIChatMessage[] = [],
     onChunk: (chunk: string) => void
-  ): Promise<{ text: string; action?: AIChatAction; suggestions?: string[]; relatedTask?: ITask }> => {
+  ): Promise<{ text: string; action?: AIChatAction; suggestions?: string[]; relatedTask?: ITask; relatedTasks?: ITask[] }> => {
     let attempts = 0;
     const maxAttempts = API_KEYS.length + 1;
 
@@ -238,6 +242,7 @@ User Message: ${userMessage}
         let parsedAction;
         let parsedSuggestions;
         let parsedRelatedTask;
+        let parsedRelatedTasks;
         
         try {
           // Clean up markdown if present
@@ -248,6 +253,7 @@ User Message: ${userMessage}
           parsedAction = parsed.action;
           parsedSuggestions = parsed.suggestions;
           parsedRelatedTask = parsed.relatedTask;
+          parsedRelatedTasks = parsed.relatedTasks;
         } catch (e) {
           console.error('Failed to parse Gemini JSON:', e);
           // If parsing fails, stream the raw response
@@ -269,7 +275,8 @@ User Message: ${userMessage}
           text: parsedText,
           action: parsedAction,
           suggestions: parsedSuggestions,
-          relatedTask: parsedRelatedTask
+          relatedTask: parsedRelatedTask,
+          relatedTasks: parsedRelatedTasks
         };
       } catch (error: any) {
         console.error('Gemini Stream API Error:', error);

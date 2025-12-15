@@ -61,8 +61,8 @@ const chatSlice = createSlice({
         }
       }
     },
-    updateMessage: (state, action: PayloadAction<{ sessionId: string; messageId: string; text: string; suggestions?: string[]; relatedTask?: ITask }>) => {
-       const { sessionId, messageId, text, suggestions, relatedTask } = action.payload;
+    updateMessage: (state, action: PayloadAction<{ sessionId: string; messageId: string; text: string; suggestions?: string[]; relatedTask?: ITask; relatedTasks?: ITask[] }>) => {
+       const { sessionId, messageId, text, suggestions, relatedTask, relatedTasks } = action.payload;
        if (state.sessions[sessionId]) {
          const msgIndex = state.sessions[sessionId].messages.findIndex(m => m.id === messageId);
          if (msgIndex !== -1) {
@@ -71,6 +71,7 @@ const chatSlice = createSlice({
              text,
              suggestions: suggestions ?? state.sessions[sessionId].messages[msgIndex].suggestions,
              relatedTask: action.payload.relatedTask ?? state.sessions[sessionId].messages[msgIndex].relatedTask,
+             relatedTasks: action.payload.relatedTasks ?? state.sessions[sessionId].messages[msgIndex].relatedTasks,
            };
            state.sessions[sessionId].updatedAt = Date.now();
          }

@@ -14,6 +14,7 @@ export interface AIChatMessage {
   createdAt: number;
   suggestions?: string[];
   relatedTask?: ITask;
+  relatedTasks?: ITask[];
 }
 
 export type AIChatAction = 

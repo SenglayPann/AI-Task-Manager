@@ -12,7 +12,7 @@ const rootReducer = combineReducers({
 const persistConfig = {
   key: 'root',
   storage: AsyncStorage,
-  whitelist: ['chat', 'tasks'], // persist chat and tasks
+  whitelist: [], // persist chat and tasks
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

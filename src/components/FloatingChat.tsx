@@ -18,6 +18,7 @@ import { AIChatMessage, ITask } from '../types/task';
 import { useTasks } from '../context/TaskContext';
 import { glassStyles } from './GlassLayout';
 import * as NavigationService from '../services/NavigationService';
+import { ChatMessageItem } from './ChatMessageItem';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CHAT_WIDTH = SCREEN_WIDTH * 0.9;
@@ -81,94 +82,11 @@ export const FloatingChat: React.FC<FloatingChatProps> = () => {
   };
 
   const renderItem = ({ item }: { item: AIChatMessage }) => (
-    <View style={{ marginBottom: 10 }}>
-      <View
-        style={[
-          styles.messageBubble,
-          item.role === 'user' ? styles.userBubble : styles.modelBubble,
-        ]}
-      >
-        <Text
-          style={[
-            styles.messageText,
-            item.role === 'user' ? styles.userText : styles.modelText,
-          ]}
-        >
-          {item.text}
-        </Text>
-
-        {item.relatedTask && (
-          <View style={styles.taskCard}>
-            <View style={styles.taskCardHeader}>
-              <Text style={styles.taskCardTitle}>{item.relatedTask.title}</Text>
-              <View
-                style={[
-                  styles.statusBadge,
-                  {
-                    backgroundColor: item.relatedTask.isCompleted
-                      ? '#E5F9E7'
-                      : '#FFF4E5',
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.statusText,
-                    {
-                      color: item.relatedTask.isCompleted
-                        ? '#269236'
-                        : '#FF9500',
-                    },
-                  ]}
-                >
-                  {item.relatedTask.isCompleted ? 'Completed' : 'Pending'}
-                </Text>
-              </View>
-            </View>
-
-            {item.relatedTask.description && (
-              <Text style={styles.taskCardDescription} numberOfLines={2}>
-                {item.relatedTask.description}
-              </Text>
-            )}
-
-            <View style={styles.taskCardFooter}>
-              {item.relatedTask.dueDate && (
-                <Text style={styles.taskCardDate}>
-                  📅 {new Date(item.relatedTask.dueDate).toLocaleDateString()}
-                </Text>
-              )}
-
-              <TouchableOpacity
-                style={styles.viewDetailsButton}
-                onPress={() => {
-                  NavigationService.navigate('TaskDetail', {
-                    task: item.relatedTask,
-                  });
-                  toggleChat();
-                }}
-              >
-                <Text style={styles.viewDetailsText}>View Details →</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-      </View>
-
-      {item.suggestions && item.suggestions.length > 0 && (
-        <View style={styles.suggestionsContainer}>
-          {item.suggestions.map((suggestion, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.suggestionButton}
-              onPress={() => sendMessage(suggestion)}
-            >
-              <Text style={styles.suggestionText}>{suggestion}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-    </View>
+    <ChatMessageItem
+      item={item}
+      onSuggestionPress={sendMessage}
+      onCloseChat={toggleChat}
+    />
   );
 
   const renderHistoryItem = ({ item }: { item: any }) => (

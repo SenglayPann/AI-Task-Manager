@@ -94,7 +94,8 @@ export const useChat = (tasks: ITask[], addTask: any, deleteTask: any, toggleCom
          messageId: streamingMsgId, 
          text: response.text,
          suggestions: response.suggestions,
-         relatedTask: response.relatedTask
+         relatedTask: response.relatedTask,
+         relatedTasks: response.relatedTasks
        }));
 
       if (response.action) {
