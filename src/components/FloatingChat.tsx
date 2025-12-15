@@ -43,40 +43,35 @@ export const FloatingChat: React.FC<FloatingChatProps> = () => {
   const [inputText, setInputText] = React.useState('');
   const [showHistory, setShowHistory] = React.useState(false);
   const flatListRef = useRef<FlatList>(null);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.8)).current;
-
-  // ... (animation effects same as before) ...
+  // Single animated value: 0 = closed, 1 = open
+  const animationProgress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (isOpen) {
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          friction: 8,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scaleAnim, {
-          toValue: 0.8,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
+    Animated.spring(animationProgress, {
+      toValue: isOpen ? 1 : 0,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 40,
+    }).start();
   }, [isOpen]);
+
+  // Interpolations
+  const fabScale = animationProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
+
+  const chatOpacity = animationProgress;
+
+  const chatScale = animationProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.8, 1],
+  });
+
+  const chatTranslateY = animationProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [50, 0],
+  });
 
   const handleSend = async () => {
     if (!inputText.trim()) return;
@@ -146,11 +141,12 @@ export const FloatingChat: React.FC<FloatingChatProps> = () => {
 
               <TouchableOpacity
                 style={styles.viewDetailsButton}
-                onPress={() =>
+                onPress={() => {
                   NavigationService.navigate('TaskDetail', {
                     task: item.relatedTask,
-                  })
-                }
+                  });
+                  toggleChat();
+                }}
               >
                 <Text style={styles.viewDetailsText}>View Details →</Text>
               </TouchableOpacity>
@@ -206,118 +202,134 @@ export const FloatingChat: React.FC<FloatingChatProps> = () => {
     </TouchableOpacity>
   );
 
-  if (!isOpen) {
-    return (
-      <TouchableOpacity style={styles.fab} onPress={toggleChat}>
-        <Text style={styles.fabText}>💬</Text>
-      </TouchableOpacity>
-    );
-  }
-
   const sortedSessions = Object.values(sessions || {}).sort(
     (a, b) => b.updatedAt - a.updatedAt,
   );
 
   return (
-    <View style={styles.overlay} pointerEvents="box-none">
+    <>
+      {/* FAB */}
       <Animated.View
         style={[
-          glassStyles.card,
-          styles.chatContainer,
-          {
-            opacity: fadeAnim,
-            transform: [{ scale: scaleAnim }],
-          },
+          styles.fabContainer,
+          { transform: [{ scale: fabScale }], opacity: fabScale },
         ]}
+        pointerEvents={isOpen ? 'none' : 'auto'}
       >
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => setShowHistory(!showHistory)}
-            style={styles.headerTitleContainer}
-          >
-            <Text style={styles.headerTitle}>
-              {showHistory
-                ? 'Chat History'
-                : sessions[currentSessionId!]?.title || 'AI Assistant'}
-            </Text>
-            <Text style={styles.dropdownIcon}>▼</Text>
-          </TouchableOpacity>
+        <TouchableOpacity style={styles.fab} onPress={toggleChat}>
+          <Text style={styles.fabText}>💬</Text>
+        </TouchableOpacity>
+      </Animated.View>
 
-          <View style={styles.headerButtons}>
-            {showHistory && (
+      {/* Chat Overlay */}
+      <Animated.View
+        style={[styles.overlay, { opacity: chatOpacity }]}
+        pointerEvents={isOpen ? 'auto' : 'none'}
+      >
+        <Animated.View
+          style={[
+            glassStyles.card,
+            styles.chatContainer,
+            {
+              transform: [{ scale: chatScale }, { translateY: chatTranslateY }],
+            },
+          ]}
+        >
+          <View style={styles.header}>
+            <TouchableOpacity
+              onPress={() => setShowHistory(!showHistory)}
+              style={styles.headerTitleContainer}
+            >
+              <Text style={styles.headerTitle}>
+                {showHistory
+                  ? 'Chat History'
+                  : sessions[currentSessionId!]?.title || 'AI Assistant'}
+              </Text>
+              <Text style={styles.dropdownIcon}>▼</Text>
+            </TouchableOpacity>
+
+            <View style={styles.headerButtons}>
+              {showHistory && (
+                <TouchableOpacity
+                  onPress={startNewSession}
+                  style={styles.headerButton}
+                >
+                  <Text style={styles.headerButtonText}>New Chat</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
-                onPress={startNewSession}
+                onPress={toggleChat}
                 style={styles.headerButton}
               >
-                <Text style={styles.headerButtonText}>New Chat</Text>
+                <Text style={styles.headerButtonText}>✕</Text>
               </TouchableOpacity>
-            )}
-            <TouchableOpacity onPress={toggleChat} style={styles.headerButton}>
-              <Text style={styles.headerButtonText}>✕</Text>
-            </TouchableOpacity>
+            </View>
           </View>
-        </View>
 
-        {showHistory ? (
-          <FlatList
-            data={sortedSessions}
-            renderItem={renderHistoryItem}
-            keyExtractor={item => item.id}
-            contentContainerStyle={styles.list}
-          />
-        ) : (
-          <>
+          {showHistory ? (
             <FlatList
-              ref={flatListRef}
-              data={messages}
-              renderItem={renderItem}
+              data={sortedSessions}
+              renderItem={renderHistoryItem}
               keyExtractor={item => item.id}
               contentContainerStyle={styles.list}
-              onContentSizeChange={() =>
-                flatListRef.current?.scrollToEnd({ animated: true })
-              }
             />
+          ) : (
+            <>
+              <FlatList
+                ref={flatListRef}
+                data={messages}
+                renderItem={renderItem}
+                keyExtractor={item => item.id}
+                contentContainerStyle={styles.list}
+                onContentSizeChange={() =>
+                  flatListRef.current?.scrollToEnd({ animated: true })
+                }
+              />
 
-            {isLoading && (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color="#007AFF" />
-                <Text style={styles.loadingText}>Thinking...</Text>
-              </View>
-            )}
+              {isLoading && (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#007AFF" />
+                  <Text style={styles.loadingText}>Thinking...</Text>
+                </View>
+              )}
 
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
-            >
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={[glassStyles.input, styles.input]}
-                  placeholder="Ask about tasks..."
-                  placeholderTextColor="#999"
-                  value={inputText}
-                  onChangeText={setInputText}
-                  onSubmitEditing={handleSend}
-                />
-                <TouchableOpacity
-                  style={styles.sendButton}
-                  onPress={handleSend}
-                >
-                  <Text style={styles.sendButtonText}>Send</Text>
-                </TouchableOpacity>
-              </View>
-            </KeyboardAvoidingView>
-          </>
-        )}
+              <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+              >
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={[glassStyles.input, styles.input]}
+                    placeholder="Ask about tasks..."
+                    placeholderTextColor="#999"
+                    value={inputText}
+                    onChangeText={setInputText}
+                    onSubmitEditing={handleSend}
+                  />
+                  <TouchableOpacity
+                    style={styles.sendButton}
+                    onPress={handleSend}
+                  >
+                    <Text style={styles.sendButtonText}>Send</Text>
+                  </TouchableOpacity>
+                </View>
+              </KeyboardAvoidingView>
+            </>
+          )}
+        </Animated.View>
       </Animated.View>
-    </View>
+    </>
   );
 };
 
 const styles = StyleSheet.create({
-  fab: {
+  fabContainer: {
     position: 'absolute',
     bottom: 30,
     right: 30,
+    zIndex: 1000,
+  },
+  fab: {
     width: 60,
     height: 60,
     borderRadius: 30,
@@ -329,7 +341,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 8,
-    zIndex: 1000,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.3)',
   },
