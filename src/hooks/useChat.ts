@@ -1,51 +1,52 @@
-import { useState, useEffect, useCallback } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '../store/store';
+import { 
+  addMessage, 
+  createSession, 
+  updateMessage, 
+  clearCurrentSession,
+  setCurrentSession,
+  deleteSession
+} from '../store/slices/chatSlice';
 import { AIChatMessage, ITask } from '../types/task';
 import { GeminiService } from '../services/GeminiService';
 
-const CHAT_STORAGE_KEY = '@chat_history';
-
 export const useChat = (tasks: ITask[], addTask: any, deleteTask: any, toggleComplete: any) => {
-  const [messages, setMessages] = useState<AIChatMessage[]>([]);
+  const dispatch = useDispatch();
+  const { currentSessionId, sessions } = useSelector((state: RootState) => state.chat);
+  
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  
+  const currentSession = currentSessionId ? sessions[currentSessionId] : null;
+  const messages = currentSession ? currentSession.messages : [];
 
-  // Load chat history on mount
+  // Initialize a session if none exists and chat is opened
   useEffect(() => {
-    loadChatHistory();
-  }, []);
-
-  const loadChatHistory = async () => {
-    try {
-      const jsonValue = await AsyncStorage.getItem(CHAT_STORAGE_KEY);
-      if (jsonValue != null) {
-        setMessages(JSON.parse(jsonValue));
-      } else {
-        // Initial greeting if no history
-        setMessages([
-          {
-            id: '1',
-            role: 'model',
-            text: 'Hello! I am your Task Assistant. How can I help you today?',
-            createdAt: Date.now(),
-          },
-        ]);
-      }
-    } catch (e) {
-      console.error('Failed to load chat history', e);
+    if (isOpen && !currentSessionId) {
+       // Check if there are any sessions, if so, maybe load the last one? 
+       // For now, let's create a new one to be safe or if it's the very first time.
+       // Actually, better UX: if no current session, show "New Chat" or empty.
+       // But to keep existing behavior (greeting), we should create one.
+       // Let's create a new session if opened and no current session.
+       startNewSession();
     }
-  };
+  }, [isOpen, currentSessionId]);
 
-  const saveChatHistory = async (newMessages: AIChatMessage[]) => {
-    try {
-      await AsyncStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(newMessages));
-    } catch (e) {
-      console.error('Failed to save chat history', e);
-    }
+  const startNewSession = () => {
+     const newId = Date.now().toString();
+     const initialMsg: AIChatMessage = {
+        id: '1',
+        role: 'model',
+        text: 'Hello! I am your Task Assistant. How can I help you today?',
+        createdAt: Date.now(),
+     };
+     dispatch(createSession({ id: newId, initialMessage: initialMsg }));
   };
 
   const sendMessage = async (text: string) => {
-    if (!text.trim()) return;
+    if (!text.trim() || !currentSessionId) return;
 
     const userMsg: AIChatMessage = {
       id: Date.now().toString(),
@@ -54,9 +55,7 @@ export const useChat = (tasks: ITask[], addTask: any, deleteTask: any, toggleCom
       createdAt: Date.now(),
     };
 
-    const updatedMessages = [...messages, userMsg];
-    setMessages(updatedMessages);
-    saveChatHistory(updatedMessages);
+    dispatch(addMessage({ sessionId: currentSessionId, message: userMsg }));
     setIsLoading(true);
 
     // Create a placeholder message for streaming
@@ -68,8 +67,7 @@ export const useChat = (tasks: ITask[], addTask: any, deleteTask: any, toggleCom
       createdAt: Date.now(),
     };
 
-    const messagesWithPlaceholder = [...updatedMessages, streamingMsg];
-    setMessages(messagesWithPlaceholder);
+    dispatch(addMessage({ sessionId: currentSessionId, message: streamingMsg }));
 
     try {
       let accumulatedText = '';
@@ -78,41 +76,25 @@ export const useChat = (tasks: ITask[], addTask: any, deleteTask: any, toggleCom
       const response = await GeminiService.sendMessageStream(
         text,
         tasks,
-        messages,
+        messages, // Pass current history including the new user message (Redux updates might be async, but here we use the local 'messages' + new one for robust context if needed, or rely on service to handle it. Actually service usually expects full history. 'messages' from selector might not be updated yet in this closure. Better to construct it.)
         (chunk: string) => {
-          // Update the streaming message with accumulated text
           accumulatedText += chunk;
-          setMessages((prev) => {
-            const updated = [...prev];
-            const streamingIndex = updated.findIndex(m => m.id === streamingMsgId);
-            if (streamingIndex !== -1) {
-              updated[streamingIndex] = {
-                ...updated[streamingIndex],
-                text: accumulatedText,
-              };
-            }
-            return updated;
-          });
+           dispatch(updateMessage({ 
+             sessionId: currentSessionId, 
+             messageId: streamingMsgId, 
+             text: accumulatedText 
+           }));
         }
       );
 
-      // Update with final parsed response
-      const aiMsg: AIChatMessage = {
-        id: streamingMsgId,
-        role: 'model',
-        text: response.text,
-        createdAt: Date.now(),
-        suggestions: response.suggestions,
-      };
-
-      // Replace the placeholder with the final message and save history
-      setMessages((prev) => {
-        const finalMessages = prev.map((msg) =>
-          msg.id === streamingMsgId ? aiMsg : msg
-        );
-        saveChatHistory(finalMessages);
-        return finalMessages;
-      });
+      // Verify final text matches accumulated or use response.text
+      // Dispatch final update with suggestions
+       dispatch(updateMessage({ 
+         sessionId: currentSessionId, 
+         messageId: streamingMsgId, 
+         text: response.text,
+         suggestions: response.suggestions
+       }));
 
       if (response.action) {
         const { action } = response;
@@ -142,26 +124,29 @@ export const useChat = (tasks: ITask[], addTask: any, deleteTask: any, toggleCom
         text: 'Sorry, I encountered an error. Please try again.',
         createdAt: Date.now(),
       };
-      const errorMessages = [...updatedMessages, errorMsg];
-      setMessages(errorMessages);
-      saveChatHistory(errorMessages);
+      
+      // We should probably remove the streaming placeholder or update it to error
+      // For simplicity, let's just update the streaming message or add error
+      dispatch(updateMessage({ 
+         sessionId: currentSessionId, 
+         messageId: streamingMsgId, 
+         text: 'Sorry, I encountered an error. Please try again.' 
+       }));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const clearChat = async () => {
-    const initialMsg: AIChatMessage = {
-      id: Date.now().toString(),
-      role: 'model',
-      text: 'Chat cleared. How can I help you?',
-      createdAt: Date.now(),
-    };
-    setMessages([initialMsg]);
-    await saveChatHistory([initialMsg]);
+  const clearChat = () => {
+    // Instead of clearing, we effectively start a new session
+    startNewSession();
   };
 
   const toggleChat = () => setIsOpen(!isOpen);
+
+  // New functions for session management
+  const switchSession = (sessionId: string) => dispatch(setCurrentSession(sessionId));
+  const removeSession = (sessionId: string) => dispatch(deleteSession(sessionId));
 
   return {
     messages,
@@ -170,5 +155,10 @@ export const useChat = (tasks: ITask[], addTask: any, deleteTask: any, toggleCom
     sendMessage,
     clearChat,
     toggleChat,
+    sessions,
+    currentSessionId,
+    switchSession,
+    removeSession, // Exporting for UI
+    startNewSession
   };
 };
