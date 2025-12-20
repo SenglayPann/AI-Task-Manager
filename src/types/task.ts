@@ -5,6 +5,16 @@ export interface ITask {
   isCompleted: boolean;
   createdAt: string; // ISO Date
   dueDate?: string; // Optional ISO Date
+  priority?: TaskPriority;
+  subtasks?: ISubtask[];
+}
+
+export type TaskPriority = 'high' | 'medium' | 'low';
+
+export interface ISubtask {
+  id: string;
+  title: string;
+  isCompleted: boolean;
 }
 
 export interface AIChatMessage {

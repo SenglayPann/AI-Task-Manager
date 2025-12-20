@@ -41,13 +41,13 @@ Task Creation Workflow:
 - If information is missing, ASK the user.
 - When asking, provide 2 reasonable suggestions for the user to choose from.
 - Only generate a 'CREATE' action when you have sufficient information or the user asks to proceed with defaults.
-
+- **New**: You can also intuitively assign a 'priority' ('high', 'medium', 'low') based on urgency/importance.
+- **New**: You can also suggest 'subtasks' (array of { title: string }) for complex tasks.
 
 Response Format:
 You MUST ALWAYS respond with a valid JSON object. Do not include markdown formatting like \`\`\`json.
 Structure:
 {
-  "text": "Your response message to the user",
   "text": "Your response message to the user",
   "suggestions": ["Option 1", "Option 2"], // Optional: suggestions for the user
   "relatedTask": { ... }, // Optional: The simplified task object if discussing a SPECIFIC existing task.
@@ -56,7 +56,7 @@ Structure:
 }
 
 Action Objects:
-- CREATE: { "type": "CREATE", "task": { "title": "...", "description": "...", "dueDate": "ISO 8601 DateTime (e.g., 2024-01-15T14:30:00.000Z)" } }
+- CREATE: { "type": "CREATE", "task": { "title": "...", "description": "...", "dueDate": "ISO 8601 DateTime", "priority": "high"|"medium"|"low", "subtasks": [{ "title": "...", "isCompleted": false }] } }
 - UPDATE: { "type": "UPDATE", "id": "...", "updates": { ... } }
 - DELETE: { "type": "DELETE", "id": "..." }
 - COMPLETE: { "COMPLETE": "COMPLETE", "id": "..." }
@@ -199,6 +199,49 @@ You MUST respond with a valid JSON object.
       }
     }
     return { title, description };
+  },
+
+  generateSubtasks: async (title: string): Promise<string[]> => {
+    let attempts = 0;
+    const maxAttempts = API_KEYS.length + 1;
+
+    while (attempts < maxAttempts) {
+      try {
+        const genAI = getGenAIClient();
+        const prompt = `
+You are a task planning assistant.
+The user has a task: "${title}".
+Please generate 3 to 5 actionable subtasks to help complete this task.
+Return ONLY a raw JSON array of strings.
+
+Example: ["Step 1", "Step 2", "Step 3"]
+`;
+
+        const response = await genAI.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: prompt,
+        });
+
+        const responseText = response.text || '';
+        const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleanJson);
+
+        if (Array.isArray(parsed)) {
+          return parsed.map(String);
+        }
+        return [];
+      } catch (error: any) {
+        console.error('Gemini Subtasks Error:', error);
+        if (error.message?.includes('429') || error.status === 429 || error.toString().includes('Resource has been exhausted')) {
+          rotateKey();
+          attempts++;
+          if (attempts >= maxAttempts) return [];
+          continue;
+        }
+        return [];
+      }
+    }
+    return [];
   },
 
   sendMessageStream: async (

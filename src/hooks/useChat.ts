@@ -22,6 +22,9 @@ export const useChat = (tasks: ITask[], addTask: any, deleteTask: any, toggleCom
   const currentSession = currentSessionId ? sessions[currentSessionId] : null;
   const messages = currentSession ? currentSession.messages : [];
 
+  // console.log('currentSessionId:', currentSessionId);
+  console.log('sessions:', sessions);
+
   // Initialize a session if none exists and chat is opened
   useEffect(() => {
     if (isOpen && !currentSessionId) {

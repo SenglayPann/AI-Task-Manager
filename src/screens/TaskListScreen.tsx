@@ -92,37 +92,65 @@ export const TaskListScreen = () => {
     return sections;
   };
 
-  const renderItem = ({ item }: { item: ITask }) => (
-    <View style={[glassStyles.card, styles.taskItem]}>
-      <TouchableOpacity
-        style={[styles.checkbox, item.isCompleted && styles.checked]}
-        onPress={() => toggleComplete(item.id)}
-      />
-      <TouchableOpacity
-        style={styles.taskContent}
-        onPress={() => navigation.navigate('TaskDetail', { taskId: item.id })}
-      >
-        <Text
-          style={[styles.taskText, item.isCompleted && styles.completedText]}
-        >
-          {item.title}
-        </Text>
-        {item.dueDate && (
-          <Text style={styles.dueDateText}>
-            {new Date(item.dueDate).toLocaleString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </Text>
+  const renderItem = ({ item }: { item: ITask }) => {
+    const priorityColor =
+      item.priority === 'high'
+        ? '#FF3B30'
+        : item.priority === 'medium'
+        ? '#FF9500'
+        : item.priority === 'low'
+        ? '#34C759'
+        : 'transparent';
+
+    const subtaskCount = item.subtasks?.length || 0;
+    const completedSubtasks =
+      item.subtasks?.filter(s => s.isCompleted).length || 0;
+
+    return (
+      <View style={[glassStyles.card, styles.taskItem]}>
+        {item.priority && (
+          <View
+            style={[styles.priorityBar, { backgroundColor: priorityColor }]}
+          />
         )}
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => deleteTask(item.id)}>
-        <Text style={styles.deleteText}>Delete</Text>
-      </TouchableOpacity>
-    </View>
-  );
+        <TouchableOpacity
+          style={[styles.checkbox, item.isCompleted && styles.checked]}
+          onPress={() => toggleComplete(item.id)}
+        />
+        <TouchableOpacity
+          style={styles.taskContent}
+          onPress={() => navigation.navigate('TaskDetail', { taskId: item.id })}
+        >
+          <Text
+            style={[styles.taskText, item.isCompleted && styles.completedText]}
+          >
+            {item.title}
+          </Text>
+          <View style={styles.metaContainer}>
+            {item.dueDate && (
+              <Text style={styles.dueDateText}>
+                📅{' '}
+                {new Date(item.dueDate).toLocaleString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </Text>
+            )}
+            {subtaskCount > 0 && (
+              <Text style={styles.subtaskText}>
+                {completedSubtasks}/{subtaskCount} subtasks
+              </Text>
+            )}
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => deleteTask(item.id)}>
+          <Text style={styles.deleteText}>Delete</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   const renderSectionHeader = ({ section: { title } }: any) => (
     <View style={styles.sectionHeader}>
@@ -337,5 +365,21 @@ const styles = StyleSheet.create({
   highlight: {
     fontWeight: 'bold',
     color: '#007AFF',
+  },
+  priorityBar: {
+    width: 4,
+    height: '100%',
+    borderRadius: 2,
+    marginRight: 10,
+  },
+  metaContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 10,
+  },
+  subtaskText: {
+    fontSize: 13,
+    color: '#666',
   },
 });
