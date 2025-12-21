@@ -5,6 +5,7 @@ import { DashboardScreen } from './src/screens/DashboardScreen';
 import { TaskListScreen } from './src/screens/TaskListScreen';
 import { TaskDetailScreen } from './src/screens/TaskDetailScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
+import { SplashScreen } from './src/screens/SplashScreen';
 import { FloatingChat } from './src/components/FloatingChat';
 import { TaskProvider } from './src/context/TaskContext';
 import { View, StyleSheet } from 'react-native';
@@ -19,6 +20,11 @@ const AppNavigator = () => {
   const hasCompletedOnboarding = useSelector(
     (state: RootState) => state.user.hasCompletedOnboarding,
   );
+  const [showSplash, setShowSplash] = React.useState(true);
+
+  if (showSplash) {
+    return <SplashScreen onAnimationComplete={() => setShowSplash(false)} />;
+  }
 
   return (
     <View style={styles.container}>

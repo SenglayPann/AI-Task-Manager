@@ -1,11 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
-  ScrollView,
+  Animated,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTasks } from '../context/TaskContext';
@@ -15,6 +15,25 @@ import { ITask } from '../types/task';
 export const DashboardScreen = () => {
   const navigation = useNavigation<any>();
   const { tasks, toggleComplete } = useTasks();
+
+  // Entrance animation
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   const statistics = useMemo(() => {
     const now = new Date().getTime();
@@ -61,7 +80,13 @@ export const DashboardScreen = () => {
   return (
     <GlassLayout>
       <SafeAreaView style={styles.container}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <Animated.ScrollView
+          contentContainerStyle={styles.scrollContent}
+          style={{
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }],
+          }}
+        >
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Dashboard</Text>
             <Text style={styles.headerSubtitle}>Welcome back!</Text>
@@ -170,7 +195,7 @@ export const DashboardScreen = () => {
               </TouchableOpacity>
             </View>
           </View>
-        </ScrollView>
+        </Animated.ScrollView>
       </SafeAreaView>
     </GlassLayout>
   );

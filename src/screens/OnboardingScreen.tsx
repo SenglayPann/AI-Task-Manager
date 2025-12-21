@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Animated,
 } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { setProfile, completeOnboarding } from '../store/slices/userSlice';
@@ -28,6 +29,25 @@ export const OnboardingScreen = ({ navigation }: any) => {
   const [customCareer, setCustomCareer] = useState('');
   const [showCareerOptions, setShowCareerOptions] = useState(false);
   const [nationality, setNationality] = useState('');
+
+  // Entrance animation
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   const handleGetStarted = () => {
     if (!name.trim()) {
@@ -56,9 +76,13 @@ export const OnboardingScreen = ({ navigation }: any) => {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.keyboardView}
         >
-          <ScrollView
+          <Animated.ScrollView
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
+            style={{
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            }}
           >
             {/* Header */}
             <View style={styles.header}>
@@ -195,7 +219,7 @@ export const OnboardingScreen = ({ navigation }: any) => {
                 <Text style={styles.label}>Nationality (optional)</Text>
                 <TextInput
                   style={[glassStyles.input, styles.input]}
-                  placeholder="e.g., Thai, American, Japanese"
+                  placeholder="e.g., Cambodian, American, Japanese"
                   placeholderTextColor="#999"
                   value={nationality}
                   onChangeText={setNationality}
@@ -218,7 +242,7 @@ export const OnboardingScreen = ({ navigation }: any) => {
             <Text style={styles.privacyNote}>
               Your information is stored locally and never shared.
             </Text>
-          </ScrollView>
+          </Animated.ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </GlassLayout>
