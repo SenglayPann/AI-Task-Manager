@@ -15,6 +15,7 @@ import { GeminiService } from '../services/GeminiService';
 export const useChat = (tasks: ITask[], addTask: any, deleteTask: any, toggleComplete: any) => {
   const dispatch = useDispatch();
   const { currentSessionId, sessions } = useSelector((state: RootState) => state.chat);
+  const userProfile = useSelector((state: RootState) => state.user.profile);
   
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -39,10 +40,13 @@ export const useChat = (tasks: ITask[], addTask: any, deleteTask: any, toggleCom
 
   const startNewSession = () => {
      const newId = Date.now().toString();
+     const greeting = userProfile?.name 
+       ? `Hello ${userProfile.name}! 👋 I am your Task Assistant. How can I help you today?`
+       : 'Hello! I am your Task Assistant. How can I help you today?';
      const initialMsg: AIChatMessage = {
         id: '1',
         role: 'model',
-        text: 'Hello! I am your Task Assistant. How can I help you today?',
+        text: greeting,
         createdAt: Date.now(),
      };
      dispatch(createSession({ id: newId, initialMessage: initialMsg }));
@@ -79,7 +83,7 @@ export const useChat = (tasks: ITask[], addTask: any, deleteTask: any, toggleCom
       const response = await GeminiService.sendMessageStream(
         text,
         tasks,
-        messages, // Pass current history including the new user message (Redux updates might be async, but here we use the local 'messages' + new one for robust context if needed, or rely on service to handle it. Actually service usually expects full history. 'messages' from selector might not be updated yet in this closure. Better to construct it.)
+        messages,
         (chunk: string) => {
           accumulatedText += chunk;
            dispatch(updateMessage({ 
@@ -87,7 +91,8 @@ export const useChat = (tasks: ITask[], addTask: any, deleteTask: any, toggleCom
              messageId: streamingMsgId, 
              text: accumulatedText 
            }));
-        }
+        },
+        userProfile
       );
 
       // Verify final text matches accumulated or use response.text

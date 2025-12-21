@@ -3,16 +3,18 @@ import { persistStore, persistReducer, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import chatReducer from './slices/chatSlice';
 import taskReducer from './slices/taskSlice';
+import userReducer from './slices/userSlice';
 
 const rootReducer = combineReducers({
   chat: chatReducer,
   tasks: taskReducer,
+  user: userReducer,
 });
 
 const persistConfig = {
   key: 'root',
   storage: AsyncStorage,
-  whitelist: [], // persist chat and tasks
+  whitelist: [], // persist user profile
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

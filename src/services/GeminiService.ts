@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import { GEMINI_API_KEY, GEMINI_API_KEY_2, GEMINI_API_KEY_3 } from '@env';
 import { ITask, AIChatAction, AIChatMessage } from '../types/task';
+import { IUserProfile } from '../types/userProfile';
 
 const API_KEYS = [GEMINI_API_KEY, GEMINI_API_KEY_2, GEMINI_API_KEY_3].filter(Boolean);
 const MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-flash']; // Alternate models per key
@@ -23,26 +24,39 @@ const rotateKey = () => {
   console.log(`Rotated to API key index: ${currentKeyIndex}, Model: ${getCurrentModel()}`);
 };
 
-const SYSTEM_INSTRUCTION = `
+const buildSystemInstruction = (userProfile?: IUserProfile | null) => {
+  let userContext = '';
+  if (userProfile) {
+    const parts = [];
+    if (userProfile.name) parts.push(`The user's name is ${userProfile.name}.`);
+    if (userProfile.age) parts.push(`They are ${userProfile.age} years old.`);
+    if (userProfile.gender) parts.push(`Gender: ${userProfile.gender}.`);
+    if (userProfile.career) parts.push(`They work as a ${userProfile.career}.`);
+    userContext = parts.length > 0 ? `\nUser Profile:\n${parts.join(' ')}\n` : '';
+  }
+
+  return `
 You are a Task Management Assistant.
 You help the user manage their tasks.
 You have access to the user's current tasks in JSON format and the recent Chat History.
-
+${userContext}
 Your capabilities:
 1. Answer questions about the tasks (e.g., "How many tasks?", "What is due?").
 2. Answer questions about the conversation history.
 3. Perform actions on tasks (Create, Update, Delete, Complete).
+4. Be personable and address the user by name when appropriate.
 
 Context Awareness:
 - You MUST use the "Chat History" section to understand the context.
+- Use the user's profile to personalize your responses when relevant.
 
 Task Creation Workflow:
 - When the user wants to create a task, you need: 'title', 'description', and 'dueDate'.
 - If information is missing, ASK the user.
 - When asking, provide 2 reasonable suggestions for the user to choose from.
 - Only generate a 'CREATE' action when you have sufficient information or the user asks to proceed with defaults.
-- **New**: You can also intuitively assign a 'priority' ('high', 'medium', 'low') based on urgency/importance.
-- **New**: You can also suggest 'subtasks' (array of { title: string }) for complex tasks.
+- You can also intuitively assign a 'priority' ('high', 'medium', 'low') based on urgency/importance.
+- You can also suggest 'subtasks' (array of { title: string }) for complex tasks.
 
 Response Format:
 You MUST ALWAYS respond with a valid JSON object. Do not include markdown formatting like \`\`\`json.
@@ -67,12 +81,14 @@ Important:
 - If the user asks about a specific task or updates a specific task, include the FULL task object in the "relatedTask" field.
 - If the user asks about a LIST of tasks (e.g. "my tasks", "pending tasks"), include the relevant tasks in "relatedTasks".
 `;
+};
 
 export const GeminiService = {
   sendMessage: async (
     userMessage: string, 
     currentTasks: ITask[], 
-    chatHistory: AIChatMessage[] = []
+    chatHistory: AIChatMessage[] = [],
+    userProfile?: IUserProfile | null
   ): Promise<{ text: string; action?: AIChatAction; suggestions?: string[]; relatedTask?: ITask; relatedTasks?: ITask[] }> => {
     let attempts = 0;
     // We try up to API_KEYS.length + 1 times to ensure we cycle back to the first key if needed
@@ -86,7 +102,7 @@ export const GeminiService = {
           .join('\n');
 
         const prompt = `
-${SYSTEM_INSTRUCTION}
+${buildSystemInstruction(userProfile)}
 
 Current Tasks:
 ${JSON.stringify(currentTasks, null, 2)}
@@ -248,7 +264,8 @@ Example: ["Step 1", "Step 2", "Step 3"]
     userMessage: string,
     currentTasks: ITask[],
     chatHistory: AIChatMessage[] = [],
-    onChunk: (chunk: string) => void
+    onChunk: (chunk: string) => void,
+    userProfile?: IUserProfile | null
   ): Promise<{ text: string; action?: AIChatAction; suggestions?: string[]; relatedTask?: ITask; relatedTasks?: ITask[] }> => {
     let attempts = 0;
     const maxAttempts = API_KEYS.length + 1;
@@ -261,7 +278,7 @@ Example: ["Step 1", "Step 2", "Step 3"]
           .join('\n');
 
         const prompt = `
-${SYSTEM_INSTRUCTION}
+${buildSystemInstruction(userProfile)}
 
 Current Tasks:
 ${JSON.stringify(currentTasks, null, 2)}
