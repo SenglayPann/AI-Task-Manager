@@ -7,7 +7,7 @@ import {
   toggleComplete as toggleCompleteAction,
   updateTask as updateTaskAction,
 } from '../store/slices/taskSlice';
-import { ITask } from '../types/task';
+import { ITask, TaskPriority, ISubtask } from '../types/task';
 
 interface TaskContextType {
   tasks: ITask[];
@@ -16,6 +16,8 @@ interface TaskContextType {
     title: string,
     description?: string,
     dueDate?: string,
+    priority?: TaskPriority,
+    subtasks?: ISubtask[],
   ) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
   toggleComplete: (id: string) => Promise<void>;
@@ -39,6 +41,8 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
     title: string,
     description?: string,
     dueDate?: string,
+    priority?: TaskPriority,
+    subtasks?: ISubtask[],
   ) => {
     const newTask: ITask = {
       id: Date.now().toString(),
@@ -47,6 +51,8 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
       isCompleted: false,
       createdAt: new Date().toISOString(),
       dueDate,
+      priority,
+      subtasks,
     };
     dispatch(addTaskAction(newTask));
   };

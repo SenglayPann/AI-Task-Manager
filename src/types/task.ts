@@ -25,6 +25,17 @@ export interface AIChatMessage {
   suggestions?: string[];
   relatedTask?: ITask;
   relatedTasks?: ITask[];
+  pendingTask?: IPendingTask;
+}
+
+// Partial task info during creation flow
+export interface IPendingTask {
+  title?: string;
+  description?: string;
+  dueDate?: string;
+  priority?: TaskPriority;
+  isComplete: boolean; // true when all required fields are filled
+  isCreated?: boolean; // true after task has been created
 }
 
 export type AIChatAction = 

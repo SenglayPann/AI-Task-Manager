@@ -27,6 +27,7 @@ export const OnboardingScreen = ({ navigation }: any) => {
   const [career, setCareer] = useState('');
   const [customCareer, setCustomCareer] = useState('');
   const [showCareerOptions, setShowCareerOptions] = useState(false);
+  const [nationality, setNationality] = useState('');
 
   const handleGetStarted = () => {
     if (!name.trim()) {
@@ -38,6 +39,7 @@ export const OnboardingScreen = ({ navigation }: any) => {
       age: age ? parseInt(age, 10) : undefined,
       gender,
       career: career === 'Other' ? customCareer : career,
+      nationality: nationality.trim() || undefined,
     };
 
     dispatch(setProfile(profile));
@@ -186,6 +188,18 @@ export const OnboardingScreen = ({ navigation }: any) => {
                     onChangeText={setCustomCareer}
                   />
                 )}
+              </View>
+
+              {/* Nationality */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Nationality (optional)</Text>
+                <TextInput
+                  style={[glassStyles.input, styles.input]}
+                  placeholder="e.g., Thai, American, Japanese"
+                  placeholderTextColor="#999"
+                  value={nationality}
+                  onChangeText={setNationality}
+                />
               </View>
             </View>
 

@@ -13,12 +13,14 @@ import {
   Dimensions,
   SafeAreaView,
 } from 'react-native';
+import { useDispatch } from 'react-redux';
 import { useChat } from '../hooks/useChat';
 import { AIChatMessage, ITask } from '../types/task';
 import { useTasks } from '../context/TaskContext';
 import { glassStyles } from './GlassLayout';
 import * as NavigationService from '../services/NavigationService';
 import { ChatMessageItem } from './ChatMessageItem';
+import { markPendingTaskCreated } from '../store/slices/chatSlice';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CHAT_WIDTH = SCREEN_WIDTH * 0.9;
@@ -27,6 +29,7 @@ const CHAT_HEIGHT = SCREEN_HEIGHT * 0.7;
 interface FloatingChatProps {}
 
 export const FloatingChat: React.FC<FloatingChatProps> = () => {
+  const dispatch = useDispatch();
   const { tasks, addTask, deleteTask, toggleComplete } = useTasks();
   const {
     messages,
@@ -81,11 +84,33 @@ export const FloatingChat: React.FC<FloatingChatProps> = () => {
     await sendMessage(text);
   };
 
+  const handleCreateTaskFromCard = async (
+    task: Partial<ITask>,
+    messageId?: string,
+  ) => {
+    if (task.title) {
+      await addTask(
+        task.title,
+        task.description,
+        task.dueDate,
+        task.priority,
+        task.subtasks,
+      );
+      // Mark the pending task as created in Redux
+      if (currentSessionId && messageId) {
+        dispatch(
+          markPendingTaskCreated({ sessionId: currentSessionId, messageId }),
+        );
+      }
+    }
+  };
+
   const renderItem = ({ item }: { item: AIChatMessage }) => (
     <ChatMessageItem
       item={item}
       onSuggestionPress={sendMessage}
       onCloseChat={toggleChat}
+      onCreateTask={task => handleCreateTaskFromCard(task, item.id)}
     />
   );
 
@@ -193,16 +218,70 @@ export const FloatingChat: React.FC<FloatingChatProps> = () => {
             />
           ) : (
             <>
-              <FlatList
-                ref={flatListRef}
-                data={messages}
-                renderItem={renderItem}
-                keyExtractor={item => item.id}
-                contentContainerStyle={styles.list}
-                onContentSizeChange={() =>
-                  flatListRef.current?.scrollToEnd({ animated: true })
-                }
-              />
+              {messages.length === 0 ? (
+                <View style={styles.emptyStateContainer}>
+                  <Text style={styles.emptyStateEmoji}>👋</Text>
+                  <Text style={styles.emptyStateTitle}>
+                    How can I help you?
+                  </Text>
+                  <Text style={styles.emptyStateSubtitle}>
+                    Try one of these quick actions:
+                  </Text>
+                  <View style={styles.quickActionsContainer}>
+                    <TouchableOpacity
+                      style={styles.quickActionButton}
+                      onPress={() => {
+                        setInputText('Create a new task');
+                        handleSend();
+                      }}
+                    >
+                      <Text style={styles.quickActionEmoji}>➕</Text>
+                      <Text style={styles.quickActionText}>Create Task</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.quickActionButton}
+                      onPress={() => {
+                        setInputText('Show my tasks');
+                        handleSend();
+                      }}
+                    >
+                      <Text style={styles.quickActionEmoji}>📋</Text>
+                      <Text style={styles.quickActionText}>Show Tasks</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.quickActionButton}
+                      onPress={() => {
+                        setInputText("What's due today?");
+                        handleSend();
+                      }}
+                    >
+                      <Text style={styles.quickActionEmoji}>📅</Text>
+                      <Text style={styles.quickActionText}>Due Today</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.quickActionButton}
+                      onPress={() => {
+                        setInputText('Summarize my tasks');
+                        handleSend();
+                      }}
+                    >
+                      <Text style={styles.quickActionEmoji}>📊</Text>
+                      <Text style={styles.quickActionText}>Summary</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <FlatList
+                  ref={flatListRef}
+                  data={messages}
+                  renderItem={renderItem}
+                  keyExtractor={item => item.id}
+                  contentContainerStyle={styles.list}
+                  onContentSizeChange={() =>
+                    flatListRef.current?.scrollToEnd({ animated: true })
+                  }
+                />
+              )}
 
               {isLoading && (
                 <View style={styles.loadingContainer}>
@@ -500,5 +579,54 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '600',
+  },
+
+  // Empty State & Quick Actions
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyStateEmoji: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  emptyStateTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  emptyStateSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
+  },
+  quickActionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 10,
+    maxWidth: '100%',
+  },
+  quickActionButton: {
+    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    minWidth: 100,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 122, 255, 0.2)',
+  },
+  quickActionEmoji: {
+    fontSize: 24,
+    marginBottom: 4,
+  },
+  quickActionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#007AFF',
   },
 });

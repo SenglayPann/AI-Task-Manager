@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  Modal,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTasks } from '../context/TaskContext';
@@ -244,7 +245,11 @@ export const TaskDetailScreen = () => {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.form}>
+        <ScrollView
+          style={styles.scrollContainer}
+          contentContainerStyle={styles.form}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Title</Text>
             <TextInput
@@ -265,8 +270,35 @@ export const TaskDetailScreen = () => {
               placeholder="Add details..."
               placeholderTextColor="#999"
               multiline
-              numberOfLines={4}
+              numberOfLines={5}
             />
+            <TouchableOpacity
+              style={[
+                styles.refineButton,
+                isEnhancing && styles.refineButtonDisabled,
+              ]}
+              onPress={async () => {
+                if (isEnhancing || !title.trim()) return;
+                setIsEnhancing(true);
+                try {
+                  const refined = await GeminiService.refineTaskContent(
+                    title,
+                    description,
+                  );
+                  setTitle(refined.title);
+                  setDescription(refined.description);
+                } catch (e) {
+                  Alert.alert('Error', 'Failed to refine content.');
+                } finally {
+                  setIsEnhancing(false);
+                }
+              }}
+              disabled={isEnhancing || !title.trim()}
+            >
+              <Text style={styles.refineButtonText}>
+                {isEnhancing ? '⏳ Refining...' : '✨ Refine with AI'}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.inputContainer}>
@@ -373,7 +405,51 @@ export const TaskDetailScreen = () => {
             </TouchableOpacity>
           </View>
 
-          {showDatePicker && (
+          {/* iOS Date Picker Modal */}
+          <Modal
+            visible={showDatePicker && Platform.OS === 'ios'}
+            transparent
+            animationType="slide"
+          >
+            <View style={styles.datePickerModalOverlay}>
+              <View style={styles.datePickerModalContent}>
+                <Text style={styles.datePickerModalTitle}>
+                  Select Date & Time
+                </Text>
+                <DateTimePicker
+                  value={date}
+                  mode="datetime"
+                  display="inline"
+                  onChange={(event, selectedDate) => {
+                    if (selectedDate) {
+                      setDate(selectedDate);
+                    }
+                  }}
+                  style={styles.iosDatePicker}
+                />
+                <View style={styles.datePickerButtonRow}>
+                  <TouchableOpacity
+                    style={styles.datePickerCancelButton}
+                    onPress={() => setShowDatePicker(false)}
+                  >
+                    <Text style={styles.datePickerCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.datePickerDoneButton}
+                    onPress={() => {
+                      setShowDatePicker(false);
+                      setDueDate(date.toISOString());
+                    }}
+                  >
+                    <Text style={styles.datePickerDoneText}>✓ Done</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+
+          {/* Android Date Picker */}
+          {showDatePicker && Platform.OS === 'android' && (
             <DateTimePicker
               value={date}
               mode="date"
@@ -382,7 +458,8 @@ export const TaskDetailScreen = () => {
             />
           )}
 
-          {showTimePicker && (
+          {/* Android Time Picker */}
+          {showTimePicker && Platform.OS === 'android' && (
             <DateTimePicker
               value={date}
               mode="time"
@@ -436,7 +513,7 @@ export const TaskDetailScreen = () => {
               </TouchableOpacity>
             </View>
           )}
-        </View>
+        </ScrollView>
       </SafeAreaView>
     </GlassLayout>
   );
@@ -469,6 +546,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#007AFF',
+  },
+  scrollContainer: {
+    flex: 1,
   },
   form: {
     padding: 20,
@@ -600,5 +680,77 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  refineButton: {
+    backgroundColor: '#007AFF',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  refineButtonDisabled: {
+    backgroundColor: '#a0c4e8',
+  },
+  refineButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  // Date Picker Modal Styles
+  datePickerModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  datePickerModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 34,
+  },
+  datePickerModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+    paddingVertical: 16,
+    color: '#333',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  iosDatePicker: {
+    height: 340,
+  },
+  datePickerButtonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 12,
+    gap: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  datePickerCancelButton: {
+    flex: 1,
+    backgroundColor: '#f0f0f0',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  datePickerCancelText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  datePickerDoneButton: {
+    flex: 1,
+    backgroundColor: '#007AFF',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  datePickerDoneText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

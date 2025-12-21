@@ -32,14 +32,26 @@ const buildSystemInstruction = (userProfile?: IUserProfile | null) => {
     if (userProfile.age) parts.push(`They are ${userProfile.age} years old.`);
     if (userProfile.gender) parts.push(`Gender: ${userProfile.gender}.`);
     if (userProfile.career) parts.push(`They work as a ${userProfile.career}.`);
-    userContext = parts.length > 0 ? `\nUser Profile:\n${parts.join(' ')}\n` : '';
+    if (userProfile.nationality) parts.push(`Nationality: ${userProfile.nationality}.`);
+    userContext = parts.length > 0 ? `\nUser Profile:\n${parts.join(' ')}\nALWAYS use this personal information to personalize your responses and make the experience relevant to the user.\n` : '';
   }
+
+  // Get current date/time for context
+  const now = new Date();
+  const currentDateInfo = `
+Current Date/Time Context:
+- Today is ${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.
+- Current time is ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}.
+- Current ISO timestamp: ${now.toISOString()}.
+`;
 
   return `
 You are a Task Management Assistant.
 You help the user manage their tasks.
 You have access to the user's current tasks in JSON format and the recent Chat History.
 ${userContext}
+${currentDateInfo}
+
 Your capabilities:
 1. Answer questions about the tasks (e.g., "How many tasks?", "What is due?").
 2. Answer questions about the conversation history.
@@ -50,13 +62,37 @@ Context Awareness:
 - You MUST use the "Chat History" section to understand the context.
 - Use the user's profile to personalize your responses when relevant.
 
+Smart Date/Time Parsing:
+- When the user mentions time-related words, ALWAYS parse them into ISO 8601 format for dueDate.
+- Examples (assuming today is ${now.toLocaleDateString()}):
+  - "tomorrow" → next day at 09:00
+  - "tomorrow at 3pm" → next day at 15:00
+  - "next Monday" → the next Monday at 09:00
+  - "in 2 hours" → current time + 2 hours
+  - "this evening" → today at 18:00
+  - "next week" → 7 days from now at 09:00
+  - "Friday at 2pm" → this coming Friday at 14:00
+  - "end of day" → today at 17:00
+- If the user doesn't specify a time, use 09:00 as the default time.
+- ALWAYS include the parsed date in the pendingTask.dueDate field.
+
+Profile-Based Description Suggestions:
+- Use the user's profile (career, age, name) to suggest relevant, personalized task descriptions.
+- For example:
+  - If user is a "Software Developer" and says "code review", suggest description like "Review pull requests and provide feedback on code quality."
+  - If user is a "Student" and says "study", suggest "Review lecture notes and prepare for upcoming exam."
+  - If user is a "Manager" and says "meeting", suggest "Prepare agenda and talking points for team meeting."
+- Make descriptions actionable with clear objectives when possible.
+
 Task Creation Workflow:
-- When the user wants to create a task, you need: 'title', 'description', and 'dueDate'.
-- If information is missing, ASK the user.
-- When asking, provide 2 reasonable suggestions for the user to choose from.
-- Only generate a 'CREATE' action when you have sufficient information or the user asks to proceed with defaults.
+- When the user wants to create a task, collect: 'title', 'description', and 'dueDate'.
+- If information is missing, ASK the user and include a "pendingTask" object showing what info you have so far.
+- PROACTIVELY suggest a description based on the title and user's profile.
+- PROACTIVELY parse any time/date mentioned by the user.
+- The "pendingTask" displays info collected and shows remaining fields to the user.
+- Set "pendingTask.isComplete" to true ONLY when title is provided (title is required).
+- When user confirms or you have enough info, use the CREATE action.
 - You can also intuitively assign a 'priority' ('high', 'medium', 'low') based on urgency/importance.
-- You can also suggest 'subtasks' (array of { title: string }) for complex tasks.
 
 Response Format:
 You MUST ALWAYS respond with a valid JSON object. Do not include markdown formatting like \`\`\`json.
@@ -64,22 +100,25 @@ Structure:
 {
   "text": "Your response message to the user",
   "suggestions": ["Option 1", "Option 2"], // Optional: suggestions for the user
-  "relatedTask": { ... }, // Optional: The simplified task object if discussing a SPECIFIC existing task.
-  "relatedTasks": [{ ... }, { ... }], // Optional: A list of simplified task objects if discussing LIST of tasks.
+  "pendingTask": { "title": "...", "description": "...", "dueDate": "ISO 8601 DateTime", "priority": "...", "isComplete": true|false }, // Optional: during task creation flow
+  "relatedTask": { ... }, // Optional: existing task being discussed
+  "relatedTasks": [{ ... }], // Optional: list of existing tasks
   "action": { ... } // Optional: the action to perform
 }
 
 Action Objects:
-- CREATE: { "type": "CREATE", "task": { "title": "...", "description": "...", "dueDate": "ISO 8601 DateTime", "priority": "high"|"medium"|"low", "subtasks": [{ "title": "...", "isCompleted": false }] } }
+- CREATE: { "type": "CREATE", "task": { "title": "...", "description": "...", "dueDate": "ISO 8601 DateTime", "priority": "high"|"medium"|"low" } }
 - UPDATE: { "type": "UPDATE", "id": "...", "updates": { ... } }
 - DELETE: { "type": "DELETE", "id": "..." }
-- COMPLETE: { "COMPLETE": "COMPLETE", "id": "..." }
+- COMPLETE: { "type": "COMPLETE", "id": "..." }
 - NONE: { "type": "NONE" }
 
 Important: 
 - Always use full ISO 8601 datetime format for dueDate (with time), not just date.
-- If the user asks about a specific task or updates a specific task, include the FULL task object in the "relatedTask" field.
-- If the user asks about a LIST of tasks (e.g. "my tasks", "pending tasks"), include the relevant tasks in "relatedTasks".
+- ALWAYS parse natural language dates/times and include them in pendingTask.dueDate.
+- PROACTIVELY suggest descriptions based on user's profile and task context.
+- Include "pendingTask" when gathering info for a new task, showing progress to user.
+- Set "isComplete: true" when the title is provided (minimum required to create).
 `;
 };
 
@@ -89,7 +128,7 @@ export const GeminiService = {
     currentTasks: ITask[], 
     chatHistory: AIChatMessage[] = [],
     userProfile?: IUserProfile | null
-  ): Promise<{ text: string; action?: AIChatAction; suggestions?: string[]; relatedTask?: ITask; relatedTasks?: ITask[] }> => {
+  ): Promise<{ text: string; action?: AIChatAction; suggestions?: string[]; relatedTask?: ITask; relatedTasks?: ITask[]; pendingTask?: { title?: string; description?: string; dueDate?: string; priority?: string; isComplete: boolean } }> => {
     let attempts = 0;
     // We try up to API_KEYS.length + 1 times to ensure we cycle back to the first key if needed
     const maxAttempts = API_KEYS.length + 1;
@@ -131,7 +170,8 @@ User Message: ${userMessage}
             action: parsed.action,
             suggestions: parsed.suggestions,
             relatedTask: parsed.relatedTask,
-            relatedTasks: parsed.relatedTasks
+            relatedTasks: parsed.relatedTasks,
+            pendingTask: parsed.pendingTask
           };
         } catch (e) {
           console.error('Failed to parse Gemini JSON:', e);
@@ -186,7 +226,7 @@ You MUST respond with a valid JSON object.
 `;
 
         const response = await genAI.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: getCurrentModel(),
           contents: prompt,
         });
 
@@ -217,6 +257,66 @@ You MUST respond with a valid JSON object.
     return { title, description };
   },
 
+  enhanceTask: async (title: string, description?: string): Promise<{ title: string; description: string }> => {
+    let attempts = 0;
+    const maxAttempts = API_KEYS.length + 1;
+
+    while (attempts < maxAttempts) {
+      try {
+        const genAI = getGenAIClient();
+        const prompt = `
+You are a productivity expert. Enhance this task to make it more actionable and descriptive.
+
+Current Task Title: "${title}"
+Current Description: "${description || 'No description provided'}"
+
+Your task:
+1. Create a clearer, more specific title that describes exactly what needs to be done
+2. Write a detailed description with:
+   - Clear objective
+   - Key steps or considerations
+   - Expected outcome
+3. Keep it concise but informative
+
+Response Format (JSON only, no markdown):
+{
+  "title": "Enhanced clear task title",
+  "description": "Detailed and actionable description with key steps"
+}
+`;
+
+        const response = await genAI.models.generateContent({
+          model: getCurrentModel(),
+          contents: prompt,
+        });
+
+        const responseText = response.text || '';
+        const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleanJson);
+
+        return {
+          title: parsed.title || title,
+          description: parsed.description || description || '',
+        };
+      } catch (error: any) {
+        console.error('Gemini Enhance Error:', error);
+        
+        if (error.message?.includes('429') || error.status === 429 || error.toString().includes('Resource has been exhausted')) {
+          console.log('Rate limit reached (Enhance). Rotating key...');
+          rotateKey();
+          attempts++;
+          if (attempts >= maxAttempts) {
+             return { title, description: description || '' };
+          }
+          continue;
+        }
+        
+        return { title, description: description || '' };
+      }
+    }
+    return { title, description: description || '' };
+  },
+
   generateSubtasks: async (title: string): Promise<string[]> => {
     let attempts = 0;
     const maxAttempts = API_KEYS.length + 1;
@@ -234,7 +334,7 @@ Example: ["Step 1", "Step 2", "Step 3"]
 `;
 
         const response = await genAI.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: getCurrentModel(),
           contents: prompt,
         });
 
@@ -266,7 +366,7 @@ Example: ["Step 1", "Step 2", "Step 3"]
     chatHistory: AIChatMessage[] = [],
     onChunk: (chunk: string) => void,
     userProfile?: IUserProfile | null
-  ): Promise<{ text: string; action?: AIChatAction; suggestions?: string[]; relatedTask?: ITask; relatedTasks?: ITask[] }> => {
+  ): Promise<{ text: string; action?: AIChatAction; suggestions?: string[]; relatedTask?: ITask; relatedTasks?: ITask[]; pendingTask?: { title?: string; description?: string; dueDate?: string; priority?: string; isComplete: boolean } }> => {
     let attempts = 0;
     const maxAttempts = API_KEYS.length + 1;
 
@@ -303,6 +403,7 @@ User Message: ${userMessage}
         let parsedSuggestions;
         let parsedRelatedTask;
         let parsedRelatedTasks;
+        let parsedPendingTask;
         
         try {
           // Clean up markdown if present
@@ -314,6 +415,7 @@ User Message: ${userMessage}
           parsedSuggestions = parsed.suggestions;
           parsedRelatedTask = parsed.relatedTask;
           parsedRelatedTasks = parsed.relatedTasks;
+          parsedPendingTask = parsed.pendingTask;
         } catch (e) {
           console.error('Failed to parse Gemini JSON:', e);
           // If parsing fails, stream the raw response
@@ -336,7 +438,8 @@ User Message: ${userMessage}
           action: parsedAction,
           suggestions: parsedSuggestions,
           relatedTask: parsedRelatedTask,
-          relatedTasks: parsedRelatedTasks
+          relatedTasks: parsedRelatedTasks,
+          pendingTask: parsedPendingTask
         };
       } catch (error: any) {
         console.error('Gemini Stream API Error:', error);

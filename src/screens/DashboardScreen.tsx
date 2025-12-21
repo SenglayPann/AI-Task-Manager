@@ -230,6 +230,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
+    marginBottom: 20,
     fontWeight: 'bold',
     color: '#333',
   },

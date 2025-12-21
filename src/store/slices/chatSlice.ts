@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { AIChatMessage, ITask } from '../../types/task';
+import { AIChatMessage, ITask, TaskPriority, IPendingTask } from '../../types/task';
 
 export interface ChatSession {
   id: string;
@@ -61,8 +61,8 @@ const chatSlice = createSlice({
         }
       }
     },
-    updateMessage: (state, action: PayloadAction<{ sessionId: string; messageId: string; text: string; suggestions?: string[]; relatedTask?: ITask; relatedTasks?: ITask[] }>) => {
-       const { sessionId, messageId, text, suggestions, relatedTask, relatedTasks } = action.payload;
+    updateMessage: (state, action: PayloadAction<{ sessionId: string; messageId: string; text: string; suggestions?: string[]; relatedTask?: ITask; relatedTasks?: ITask[]; pendingTask?: IPendingTask }>) => {
+       const { sessionId, messageId, text, suggestions, relatedTask, relatedTasks, pendingTask } = action.payload;
        if (state.sessions[sessionId]) {
          const msgIndex = state.sessions[sessionId].messages.findIndex(m => m.id === messageId);
          if (msgIndex !== -1) {
@@ -70,12 +70,23 @@ const chatSlice = createSlice({
              ...state.sessions[sessionId].messages[msgIndex],
              text,
              suggestions: suggestions ?? state.sessions[sessionId].messages[msgIndex].suggestions,
-             relatedTask: action.payload.relatedTask ?? state.sessions[sessionId].messages[msgIndex].relatedTask,
-             relatedTasks: action.payload.relatedTasks ?? state.sessions[sessionId].messages[msgIndex].relatedTasks,
+             relatedTask: relatedTask ?? state.sessions[sessionId].messages[msgIndex].relatedTask,
+             relatedTasks: relatedTasks ?? state.sessions[sessionId].messages[msgIndex].relatedTasks,
+             pendingTask: pendingTask ?? state.sessions[sessionId].messages[msgIndex].pendingTask,
            };
            state.sessions[sessionId].updatedAt = Date.now();
          }
        }
+    },
+    markPendingTaskCreated: (state, action: PayloadAction<{ sessionId: string; messageId: string }>) => {
+      const { sessionId, messageId } = action.payload;
+      if (state.sessions[sessionId]) {
+        const msgIndex = state.sessions[sessionId].messages.findIndex(m => m.id === messageId);
+        if (msgIndex !== -1 && state.sessions[sessionId].messages[msgIndex].pendingTask) {
+          state.sessions[sessionId].messages[msgIndex].pendingTask!.isCreated = true;
+          state.sessions[sessionId].updatedAt = Date.now();
+        }
+      }
     },
     deleteSession: (state, action: PayloadAction<string>) => {
       delete state.sessions[action.payload];
@@ -95,6 +106,7 @@ export const {
   updateSessionTitle,
   addMessage,
   updateMessage,
+  markPendingTaskCreated,
   deleteSession,
   clearCurrentSession
 } = chatSlice.actions;

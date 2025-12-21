@@ -40,16 +40,7 @@ export const useChat = (tasks: ITask[], addTask: any, deleteTask: any, toggleCom
 
   const startNewSession = () => {
      const newId = Date.now().toString();
-     const greeting = userProfile?.name 
-       ? `Hello ${userProfile.name}! 👋 I am your Task Assistant. How can I help you today?`
-       : 'Hello! I am your Task Assistant. How can I help you today?';
-     const initialMsg: AIChatMessage = {
-        id: '1',
-        role: 'model',
-        text: greeting,
-        createdAt: Date.now(),
-     };
-     dispatch(createSession({ id: newId, initialMessage: initialMsg }));
+     dispatch(createSession({ id: newId }));
   };
 
   const sendMessage = async (text: string) => {
@@ -103,7 +94,11 @@ export const useChat = (tasks: ITask[], addTask: any, deleteTask: any, toggleCom
          text: response.text,
          suggestions: response.suggestions,
          relatedTask: response.relatedTask,
-         relatedTasks: response.relatedTasks
+         relatedTasks: response.relatedTasks,
+         pendingTask: response.pendingTask ? {
+           ...response.pendingTask,
+           priority: response.pendingTask.priority as 'high' | 'medium' | 'low' | undefined
+         } : undefined
        }));
 
       if (response.action) {
