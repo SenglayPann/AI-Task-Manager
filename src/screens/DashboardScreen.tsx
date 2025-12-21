@@ -53,6 +53,45 @@ export const DashboardScreen = () => {
     return { total, completed, pending, overdue };
   }, [tasks]);
 
+  // Task Health Calculation
+  const taskHealth = useMemo(() => {
+    const { total, completed, overdue, pending } = statistics;
+
+    if (total === 0) {
+      return { score: 100, label: 'No Tasks', color: '#8E8E93', emoji: '📋' };
+    }
+
+    // Health factors:
+    // 1. Completion rate (40% weight)
+    const completionRate = (completed / total) * 100;
+
+    // 2. Overdue penalty (40% weight) - more overdue = worse health
+    const overdueRate = pending > 0 ? (overdue / pending) * 100 : 0;
+    const overduePenalty = overdueRate;
+
+    // 3. Overall productivity (20% weight) - having tasks and completing them
+    const productivityBonus = total > 0 && completed > 0 ? 20 : 0;
+
+    // Calculate score
+    let score = Math.round(
+      completionRate * 0.4 + (100 - overduePenalty) * 0.4 + productivityBonus,
+    );
+
+    // Clamp between 0-100
+    score = Math.max(0, Math.min(100, score));
+
+    // Determine label and color
+    if (score >= 80) {
+      return { score, label: 'Excellent', color: '#34C759', emoji: '🌟' };
+    } else if (score >= 60) {
+      return { score, label: 'Good', color: '#007AFF', emoji: '👍' };
+    } else if (score >= 40) {
+      return { score, label: 'Fair', color: '#FF9500', emoji: '⚠️' };
+    } else {
+      return { score, label: 'Needs Work', color: '#FF3B30', emoji: '🔴' };
+    }
+  }, [statistics]);
+
   const upcomingTasks = useMemo(() => {
     const now = new Date().getTime();
     return tasks
@@ -90,6 +129,43 @@ export const DashboardScreen = () => {
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Dashboard</Text>
             <Text style={styles.headerSubtitle}>Welcome back!</Text>
+          </View>
+
+          {/* Task Health Card */}
+          <View style={[glassStyles.card, styles.healthCard]}>
+            <View style={styles.healthContent}>
+              <View style={styles.healthLeft}>
+                <Text style={styles.healthEmoji}>{taskHealth.emoji}</Text>
+                <View>
+                  <Text style={styles.healthLabel}>Task Health</Text>
+                  <Text
+                    style={[styles.healthStatus, { color: taskHealth.color }]}
+                  >
+                    {taskHealth.label}
+                  </Text>
+                </View>
+              </View>
+              <View
+                style={[styles.healthScore, { borderColor: taskHealth.color }]}
+              >
+                <Text
+                  style={[styles.healthScoreText, { color: taskHealth.color }]}
+                >
+                  {taskHealth.score}%
+                </Text>
+              </View>
+            </View>
+            <View style={styles.healthBar}>
+              <View
+                style={[
+                  styles.healthBarFill,
+                  {
+                    width: `${taskHealth.score}%`,
+                    backgroundColor: taskHealth.color,
+                  },
+                ]}
+              />
+            </View>
           </View>
 
           {/* Statistics Cards */}
@@ -327,5 +403,57 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+
+  // Task Health Styles
+  healthCard: {
+    padding: 16,
+    marginBottom: 20,
+  },
+  healthContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  healthLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  healthEmoji: {
+    fontSize: 36,
+  },
+  healthLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 2,
+  },
+  healthStatus: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  healthScore: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 3,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.5)',
+  },
+  healthScoreText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  healthBar: {
+    height: 8,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  healthBarFill: {
+    height: '100%',
+    borderRadius: 4,
   },
 });

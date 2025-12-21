@@ -39,6 +39,17 @@ export const useChat = (tasks: ITask[], addTask: any, deleteTask: any, toggleCom
   }, [isOpen, currentSessionId]);
 
   const startNewSession = () => {
+     // Check if there's already an empty session
+     const existingEmptySession = Object.values(sessions || {}).find(
+       session => session.messages.length === 0
+     );
+     
+     if (existingEmptySession) {
+       // Switch to existing empty session instead of creating new one
+       dispatch(switchSession(existingEmptySession.id));
+       return;
+     }
+     
      const newId = Date.now().toString();
      dispatch(createSession({ id: newId }));
   };
