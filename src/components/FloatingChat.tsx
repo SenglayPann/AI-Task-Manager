@@ -20,7 +20,7 @@ import { useTasks } from '../context/TaskContext';
 import { glassStyles } from './GlassLayout';
 import * as NavigationService from '../services/NavigationService';
 import { ChatMessageItem } from './ChatMessageItem';
-import { markPendingTaskCreated } from '../store/slices/chatSlice';
+import { markPendingTaskCreated, addMessage } from '../store/slices/chatSlice';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CHAT_WIDTH = SCREEN_WIDTH * 0.9;
@@ -89,17 +89,46 @@ export const FloatingChat: React.FC<FloatingChatProps> = () => {
     messageId?: string,
   ) => {
     if (task.title) {
-      await addTask(
+      // Create the task and get its ID
+      const taskId = await addTask(
         task.title,
         task.description,
         task.dueDate,
         task.priority,
         task.subtasks,
       );
+
       // Mark the pending task as created in Redux
       if (currentSessionId && messageId) {
         dispatch(
           markPendingTaskCreated({ sessionId: currentSessionId, messageId }),
+        );
+
+        // Add confirmation message with the created task card
+        const createdTask: ITask = {
+          id: taskId || Date.now().toString(),
+          title: task.title,
+          description: task.description,
+          dueDate: task.dueDate,
+          priority: task.priority || 'medium',
+          isCompleted: false,
+          subtasks: task.subtasks || [],
+          createdAt: new Date().toISOString(),
+        };
+
+        const confirmationMessage: AIChatMessage = {
+          id: Date.now().toString(),
+          role: 'model',
+          text: `✅ Task "${task.title}" has been created successfully! You can tap the card below to view or edit it.`,
+          createdAt: Date.now(),
+          relatedTask: createdTask,
+        };
+
+        dispatch(
+          addMessage({
+            sessionId: currentSessionId,
+            message: confirmationMessage,
+          }),
         );
       }
     }

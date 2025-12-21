@@ -22,7 +22,7 @@ import { ScrollView } from 'react-native';
 export const TaskDetailScreen = () => {
   const navigation = useNavigation();
   const route = useRoute<any>();
-  const { addTask, tasks, updateTask } = useTasks();
+  const { addTask, tasks, updateTask, deleteTask } = useTasks();
 
   const taskId = route.params?.taskId;
   const isEditing = !!taskId;
@@ -104,8 +104,7 @@ export const TaskDetailScreen = () => {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            const { deleteTask: deleteTaskFn } = useTasks();
-            await deleteTaskFn(taskId);
+            await deleteTask(taskId);
             navigation.goBack();
           },
         },

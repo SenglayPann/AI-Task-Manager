@@ -18,7 +18,7 @@ interface TaskContextType {
     dueDate?: string,
     priority?: TaskPriority,
     subtasks?: ISubtask[],
-  ) => Promise<void>;
+  ) => Promise<string>;
   deleteTask: (id: string) => Promise<void>;
   toggleComplete: (id: string) => Promise<void>;
   updateTask: (
@@ -43,7 +43,7 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
     dueDate?: string,
     priority?: TaskPriority,
     subtasks?: ISubtask[],
-  ) => {
+  ): Promise<string> => {
     const newTask: ITask = {
       id: Date.now().toString(),
       title,
@@ -55,6 +55,7 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
       subtasks,
     };
     dispatch(addTaskAction(newTask));
+    return newTask.id;
   };
 
   const deleteTask = async (id: string) => {
