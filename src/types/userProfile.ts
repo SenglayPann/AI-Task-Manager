@@ -4,6 +4,7 @@ export interface IUserProfile {
   gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
   career?: string;
   nationality?: string;
+  selfDescription?: string;
 }
 
 export const GENDER_OPTIONS = [

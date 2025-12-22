@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useRef } from 'react';
+import React, { useMemo, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,13 @@ import {
   StyleSheet,
   SafeAreaView,
   Animated,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTasks } from '../context/TaskContext';
 import { GlassLayout, glassStyles } from '../components/GlassLayout';
 import { ITask } from '../types/task';
+import { GeminiService } from '../services/GeminiService';
 
 export const DashboardScreen = () => {
   const navigation = useNavigation<any>();
@@ -19,6 +21,15 @@ export const DashboardScreen = () => {
   // Entrance animation
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+
+  // Flip card state and animation
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [advice, setAdvice] = useState('');
+  const [isLoadingAdvice, setIsLoadingAdvice] = useState(false);
+  const [lastTasksHash, setLastTasksHash] = useState('');
+  const [backCardHeight, setBackCardHeight] = useState(180); // Dynamic back card height
+  const flipAnim = useRef(new Animated.Value(0)).current;
+  const heightAnim = useRef(new Animated.Value(180)).current; // Initial height
 
   useEffect(() => {
     Animated.parallel([
@@ -116,6 +127,152 @@ export const DashboardScreen = () => {
     });
   };
 
+  // Generate a hash of tasks to detect changes
+  const currentTasksHash = useMemo(() => {
+    return JSON.stringify(
+      tasks.map(t => ({
+        id: t.id,
+        isCompleted: t.isCompleted,
+        dueDate: t.dueDate,
+      })),
+    );
+  }, [tasks]);
+
+  // Reset advice when tasks change (will regenerate on next button press)
+  useEffect(() => {
+    if (currentTasksHash !== lastTasksHash && lastTasksHash !== '') {
+      setAdvice('');
+    }
+  }, [currentTasksHash]);
+
+  const flipCard = () => {
+    const toValue = isFlipped ? 0 : 1;
+    const targetHeight = isFlipped ? 180 : Math.max(180, backCardHeight); // Front: 180, Back: dynamic
+
+    Animated.parallel([
+      Animated.spring(flipAnim, {
+        toValue,
+        friction: 8,
+        tension: 10,
+        useNativeDriver: true,
+      }),
+      Animated.timing(heightAnim, {
+        toValue: targetHeight,
+        duration: 300,
+        useNativeDriver: false, // Height can't use native driver
+      }),
+    ]).start();
+    setIsFlipped(!isFlipped);
+  };
+
+  // Animate height when backCardHeight changes (after advice loads)
+  useEffect(() => {
+    if (isFlipped && backCardHeight > 180) {
+      Animated.timing(heightAnim, {
+        toValue: backCardHeight,
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [backCardHeight, isFlipped]);
+
+  const generateAdvice = async () => {
+    setIsLoadingAdvice(true);
+    setLastTasksHash(currentTasksHash);
+
+    try {
+      // Build detailed task information for AI
+      const overdueTasks = tasks.filter(
+        t =>
+          !t.isCompleted &&
+          t.dueDate &&
+          new Date(t.dueDate).getTime() < Date.now(),
+      );
+      const pendingTasks = tasks.filter(t => !t.isCompleted);
+
+      const taskDetails = pendingTasks
+        .map(t => {
+          const isOverdue =
+            t.dueDate && new Date(t.dueDate).getTime() < Date.now();
+          const subtaskProgress = t.subtasks?.length
+            ? `${t.subtasks.filter(s => s.isCompleted).length}/${
+                t.subtasks.length
+              } subtasks done`
+            : 'no subtasks';
+          return `- "${t.title}" (${t.priority || 'no'} priority, ${
+            isOverdue
+              ? 'OVERDUE'
+              : t.dueDate
+              ? `due ${new Date(t.dueDate).toLocaleDateString()}`
+              : 'no deadline'
+          }, ${subtaskProgress})`;
+        })
+        .join('\n');
+
+      const prompt = `You are a productivity coach and task advisor. Analyze the user's task situation and provide step-by-step actionable advice.
+
+=== TASK HEALTH OVERVIEW ===
+Health Score: ${taskHealth.score}% (${taskHealth.label})
+Total Tasks: ${statistics.total}
+Completed: ${statistics.completed}
+Pending: ${statistics.pending}
+Overdue: ${statistics.overdue}
+
+=== PENDING TASKS ===
+${taskDetails || 'No pending tasks'}
+
+=== YOUR ADVICE ===
+Based on the task health ${
+        taskHealth.score < 60 ? '(which needs improvement)' : ''
+      }, provide:
+${
+  taskHealth.score < 40
+    ? '1. Step-by-step recovery plan to get back on track\n2. Which overdue tasks to prioritize first\n3. Quick wins they can achieve today'
+    : taskHealth.score < 60
+    ? '1. Specific improvements to boost productivity\n2. Tasks to focus on next\n3. Tips to prevent overdue tasks'
+    : '1. How to maintain this good momentum\n2. Any optimization suggestions\n3. Encouragement to keep going'
+}
+
+Keep advice concise (max 4-5 sentences). Be encouraging and specific about WHICH tasks to tackle. Do not use markdown formatting or bullet points.`;
+
+      const response = await GeminiService.sendMessage(prompt, tasks, []);
+      setAdvice(response.text);
+    } catch (error) {
+      setAdvice('Unable to get advice right now. Try again later!');
+    } finally {
+      setIsLoadingAdvice(false);
+    }
+  };
+
+  const handleGetAdvice = async () => {
+    if (!isFlipped) {
+      // Flip card first, then generate advice
+      flipCard();
+      if (!advice || currentTasksHash !== lastTasksHash) {
+        await generateAdvice();
+      }
+    } else {
+      flipCard();
+    }
+  };
+
+  // Flip animation interpolation
+  const frontInterpolate = flipAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
+  const backInterpolate = flipAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['180deg', '360deg'],
+  });
+
+  const frontAnimatedStyle = {
+    transform: [{ rotateY: frontInterpolate }],
+  };
+  const backAnimatedStyle = {
+    transform: [{ rotateY: backInterpolate }],
+  };
+
   return (
     <GlassLayout>
       <SafeAreaView style={styles.container}>
@@ -131,42 +288,112 @@ export const DashboardScreen = () => {
             <Text style={styles.headerSubtitle}>Welcome back!</Text>
           </View>
 
-          {/* Task Health Card */}
-          <View style={[glassStyles.card, styles.healthCard]}>
-            <View style={styles.healthContent}>
-              <View style={styles.healthLeft}>
-                <Text style={styles.healthEmoji}>{taskHealth.emoji}</Text>
-                <View>
-                  <Text style={styles.healthLabel}>Task Health</Text>
+          {/* Task Health Card - Flip Card */}
+          <Animated.View
+            style={[styles.flipCardContainer, { height: heightAnim }]}
+          >
+            {/* Front Side - Health Display */}
+            <Animated.View
+              style={[
+                glassStyles.card,
+                styles.healthCard,
+                styles.flipCardFace,
+                frontAnimatedStyle,
+              ]}
+            >
+              <View style={styles.healthContent}>
+                <View style={styles.healthLeft}>
+                  <Text style={styles.healthEmoji}>{taskHealth.emoji}</Text>
+                  <View>
+                    <Text style={styles.healthLabel}>Task Health</Text>
+                    <Text
+                      style={[styles.healthStatus, { color: taskHealth.color }]}
+                    >
+                      {taskHealth.label}
+                    </Text>
+                  </View>
+                </View>
+                <View
+                  style={[
+                    styles.healthScore,
+                    { borderColor: taskHealth.color },
+                  ]}
+                >
                   <Text
-                    style={[styles.healthStatus, { color: taskHealth.color }]}
+                    style={[
+                      styles.healthScoreText,
+                      { color: taskHealth.color },
+                    ]}
                   >
-                    {taskHealth.label}
+                    {taskHealth.score}%
                   </Text>
                 </View>
               </View>
-              <View
-                style={[styles.healthScore, { borderColor: taskHealth.color }]}
-              >
-                <Text
-                  style={[styles.healthScoreText, { color: taskHealth.color }]}
-                >
-                  {taskHealth.score}%
-                </Text>
+              <View style={styles.healthBar}>
+                <View
+                  style={[
+                    styles.healthBarFill,
+                    {
+                      width: `${taskHealth.score}%`,
+                      backgroundColor: taskHealth.color,
+                    },
+                  ]}
+                />
               </View>
-            </View>
-            <View style={styles.healthBar}>
-              <View
-                style={[
-                  styles.healthBarFill,
-                  {
-                    width: `${taskHealth.score}%`,
-                    backgroundColor: taskHealth.color,
-                  },
-                ]}
-              />
-            </View>
-          </View>
+              <TouchableOpacity
+                style={styles.getAdviceButton}
+                onPress={handleGetAdvice}
+              >
+                <Text style={styles.getAdviceText}>💡 Get Advice</Text>
+              </TouchableOpacity>
+            </Animated.View>
+
+            {/* Back Side - AI Advice */}
+            <Animated.View
+              style={[
+                glassStyles.card,
+                styles.healthCard,
+                styles.flipCardFace,
+                styles.flipCardBack,
+                backAnimatedStyle,
+              ]}
+              onLayout={event => {
+                const { height } = event.nativeEvent.layout;
+                if (height > 0 && height !== backCardHeight) {
+                  setBackCardHeight(height);
+                }
+              }}
+            >
+              <View style={styles.adviceHeader}>
+                <Text style={styles.adviceTitle}>💡 AI Coach Advice</Text>
+              </View>
+              <View style={styles.adviceContent}>
+                {isLoadingAdvice ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="small" color="#007AFF" />
+                    <Text style={styles.loadingText}>Generating advice...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.adviceText}>{advice}</Text>
+                )}
+              </View>
+              <View style={styles.adviceButtonRow}>
+                <TouchableOpacity
+                  style={[styles.getAdviceButton, styles.flipBackButton]}
+                  onPress={handleGetAdvice}
+                >
+                  <Text style={styles.getAdviceText}>← Back</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.getAdviceButton, styles.refreshButton]}
+                  onPress={generateAdvice}
+                  disabled={isLoadingAdvice}
+                >
+                  <Text style={styles.getAdviceText}>🔄 Refresh</Text>
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+          </Animated.View>
 
           {/* Statistics Cards */}
           <View style={styles.statsContainer}>
@@ -482,5 +709,72 @@ const styles = StyleSheet.create({
   healthBarFill: {
     height: '100%',
     borderRadius: 4,
+  },
+  // Flip Card Styles
+  flipCardContainer: {
+    height: 200,
+    marginBottom: 15,
+  },
+  flipCardFace: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    backfaceVisibility: 'hidden',
+  },
+  flipCardBack: {
+    position: 'absolute',
+  },
+  getAdviceButton: {
+    marginTop: 12,
+    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  flipBackButton: {
+    backgroundColor: 'rgba(100, 100, 100, 0.1)',
+    flex: 1,
+  },
+  refreshButton: {
+    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+    flex: 1,
+  },
+  adviceButtonRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  getAdviceText: {
+    color: '#007AFF',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  adviceHeader: {
+    marginBottom: 12,
+  },
+  adviceTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  adviceContent: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  adviceText: {
+    fontSize: 14,
+    color: '#555',
+    lineHeight: 20,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#666',
   },
 });

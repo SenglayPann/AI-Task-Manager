@@ -29,6 +29,7 @@ export const OnboardingScreen = ({ navigation }: any) => {
   const [customCareer, setCustomCareer] = useState('');
   const [showCareerOptions, setShowCareerOptions] = useState(false);
   const [nationality, setNationality] = useState('');
+  const [selfDescription, setSelfDescription] = useState('');
 
   // Entrance animation
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -60,6 +61,7 @@ export const OnboardingScreen = ({ navigation }: any) => {
       gender,
       career: career === 'Other' ? customCareer : career,
       nationality: nationality.trim() || undefined,
+      selfDescription: selfDescription.trim() || undefined,
     };
 
     dispatch(setProfile(profile));
@@ -225,6 +227,27 @@ export const OnboardingScreen = ({ navigation }: any) => {
                   onChangeText={setNationality}
                 />
               </View>
+
+              {/* Self Description */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>
+                  Tell me about yourself (optional)
+                </Text>
+                <TextInput
+                  style={[
+                    glassStyles.input,
+                    styles.input,
+                    styles.multilineInput,
+                  ]}
+                  placeholder="E.g., I'm a morning person who loves coding. I prefer visual reminders and work best with deadlines..."
+                  placeholderTextColor="#999"
+                  value={selfDescription}
+                  onChangeText={setSelfDescription}
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                />
+              </View>
             </View>
 
             {/* CTA Button */}
@@ -296,6 +319,10 @@ const styles = StyleSheet.create({
   },
   input: {
     fontSize: 16,
+  },
+  multilineInput: {
+    minHeight: 100,
+    paddingTop: 12,
   },
   optionsRow: {
     flexDirection: 'row',
