@@ -18,6 +18,11 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { GlassLayout, glassStyles } from '../components/GlassLayout';
 import { ISubtask, TaskPriority } from '../types/task';
 import { ScrollView } from 'react-native';
+import DraggableFlatList, {
+  RenderItemParams,
+  ScaleDecorator,
+} from 'react-native-draggable-flatlist';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 export const TaskDetailScreen = () => {
   const navigation = useNavigation();
@@ -246,7 +251,7 @@ export const TaskDetailScreen = () => {
 
         <ScrollView
           style={styles.scrollContainer}
-          contentContainerStyle={styles.form}
+          contentContainerStyle={[styles.form, { overflow: 'visible' }]}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.inputContainer}>
@@ -349,28 +354,62 @@ export const TaskDetailScreen = () => {
             </View>
           </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Subtasks</Text>
-            {subtasks.map(s => (
-              <View key={s.id} style={styles.subtaskItem}>
-                <TouchableOpacity onPress={() => toggleSubtask(s.id)}>
-                  <Text style={styles.subtaskCheck}>
-                    {s.isCompleted ? '☑️' : '⬜'}
-                  </Text>
-                </TouchableOpacity>
-                <Text
-                  style={[
-                    styles.subtaskTitle,
-                    s.isCompleted && styles.subtaskCompleted,
-                  ]}
-                >
-                  {s.title}
-                </Text>
-                <TouchableOpacity onPress={() => deleteSubtask(s.id)}>
-                  <Text style={styles.deleteSubtask}>✕</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
+          <View style={[styles.inputContainer, { overflow: 'visible' }]}>
+            <Text style={styles.label}>Subtasks (hold to drag)</Text>
+            <GestureHandlerRootView style={{ overflow: 'visible' }}>
+              <DraggableFlatList
+                data={subtasks}
+                keyExtractor={item => item.id}
+                onDragEnd={({ data }) => setSubtasks(data)}
+                scrollEnabled={false}
+                style={{ overflow: 'visible' }}
+                renderItem={({
+                  item: s,
+                  drag,
+                  isActive,
+                }: RenderItemParams<ISubtask>) => (
+                  <ScaleDecorator>
+                    <TouchableOpacity
+                      onLongPress={drag}
+                      disabled={isActive}
+                      style={[
+                        styles.subtaskItem,
+                        isActive && styles.subtaskItemDragging,
+                      ]}
+                    >
+                      <TouchableOpacity onPress={() => toggleSubtask(s.id)}>
+                        <Text style={styles.subtaskCheck}>
+                          {s.isCompleted ? '☑️' : '⬜'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TextInput
+                        style={[
+                          styles.subtaskTitle,
+                          styles.subtaskInput,
+                          s.isCompleted && styles.subtaskCompleted,
+                        ]}
+                        value={s.title}
+                        onChangeText={text => {
+                          setSubtasks(prev =>
+                            prev.map(sub =>
+                              sub.id === s.id ? { ...sub, title: text } : sub,
+                            ),
+                          );
+                        }}
+                        placeholder="Subtask..."
+                        placeholderTextColor="#999"
+                      />
+                      <View style={styles.subtaskActions}>
+                        <Text style={styles.dragHandle}>≡</Text>
+                        <TouchableOpacity onPress={() => deleteSubtask(s.id)}>
+                          <Text style={styles.deleteSubtask}>✕</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </TouchableOpacity>
+                  </ScaleDecorator>
+                )}
+              />
+            </GestureHandlerRootView>
 
             <View style={styles.addSubtaskContainer}>
               <TextInput
@@ -522,6 +561,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'transparent',
+    overflow: 'visible',
   },
   header: {
     flexDirection: 'row',
@@ -599,8 +639,26 @@ const styles = StyleSheet.create({
   },
   deleteSubtask: {
     fontSize: 18,
-    color: '#999',
+    color: '#FF3B30',
     padding: 5,
+  },
+  subtaskActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  subtaskItemDragging: {
+    backgroundColor: 'rgba(0, 122, 255, 0.15)',
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  dragHandle: {
+    fontSize: 22,
+    color: '#666',
+    paddingHorizontal: 8,
   },
   addSubtaskContainer: {
     flexDirection: 'row',

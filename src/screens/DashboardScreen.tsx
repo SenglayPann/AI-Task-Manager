@@ -214,33 +214,52 @@ export const DashboardScreen = () => {
                 </Text>
               </View>
             ) : (
-              upcomingTasks.map(task => (
-                <TouchableOpacity
-                  key={task.id}
-                  style={[glassStyles.card, styles.taskCard]}
-                  onPress={() =>
-                    navigation.navigate('TaskDetail', { taskId: task.id })
-                  }
-                >
-                  <View style={styles.taskContent}>
-                    <TouchableOpacity
-                      style={styles.checkbox}
-                      onPress={e => {
-                        e.stopPropagation();
-                        toggleComplete(task.id);
-                      }}
-                    />
-                    <View style={styles.taskInfo}>
-                      <Text style={styles.taskTitle}>{task.title}</Text>
-                      {task.dueDate && (
-                        <Text style={styles.taskDate}>
-                          📅 {formatDateTime(task.dueDate)}
-                        </Text>
-                      )}
+              upcomingTasks.map(task => {
+                const priorityColor =
+                  task.priority === 'high'
+                    ? '#FF3B30'
+                    : task.priority === 'medium'
+                    ? '#FF9500'
+                    : task.priority === 'low'
+                    ? '#34C759'
+                    : 'transparent';
+
+                return (
+                  <TouchableOpacity
+                    key={task.id}
+                    style={[glassStyles.card, styles.taskCard]}
+                    onPress={() =>
+                      navigation.navigate('TaskDetail', { taskId: task.id })
+                    }
+                  >
+                    {task.priority && (
+                      <View
+                        style={[
+                          styles.priorityBar,
+                          { backgroundColor: priorityColor },
+                        ]}
+                      />
+                    )}
+                    <View style={styles.taskContent}>
+                      <TouchableOpacity
+                        style={styles.checkbox}
+                        onPress={e => {
+                          e.stopPropagation();
+                          toggleComplete(task.id);
+                        }}
+                      />
+                      <View style={styles.taskInfo}>
+                        <Text style={styles.taskTitle}>{task.title}</Text>
+                        {task.dueDate && (
+                          <Text style={styles.taskDate}>
+                            📅 {formatDateTime(task.dueDate)}
+                          </Text>
+                        )}
+                      </View>
                     </View>
-                  </View>
-                </TouchableOpacity>
-              ))
+                  </TouchableOpacity>
+                );
+              })
             )}
           </View>
 
@@ -357,6 +376,14 @@ const styles = StyleSheet.create({
   taskCard: {
     padding: 15,
     marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  priorityBar: {
+    width: 4,
+    height: '100%',
+    borderRadius: 2,
+    marginRight: 10,
   },
   taskContent: {
     flexDirection: 'row',

@@ -63,6 +63,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f0f2f5', // Fallback
+    overflow: 'visible',
   },
   background: {
     ...StyleSheet.absoluteFillObject,
@@ -98,5 +99,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    overflow: 'visible',
   },
 });

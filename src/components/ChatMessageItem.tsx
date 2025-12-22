@@ -18,6 +18,11 @@ import {
 } from '../types/task';
 import * as NavigationService from '../services/NavigationService';
 import { GeminiService } from '../services/GeminiService';
+import DraggableFlatList, {
+  RenderItemParams,
+  ScaleDecorator,
+} from 'react-native-draggable-flatlist';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 interface ChatMessageItemProps {
   item: AIChatMessage;
@@ -133,7 +138,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
     };
 
     return (
-      <View style={styles.pendingCard}>
+      <View style={[styles.pendingCard, { overflow: 'visible' }]}>
         <View style={styles.pendingCardHeader}>
           <Text style={styles.pendingCardTitle}>📝 New Task</Text>
           <View
@@ -331,22 +336,71 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
         </View>
 
         {/* Subtasks Section */}
-        <View style={styles.inputGroup}>
+        <View style={[styles.inputGroup, { overflow: 'visible' }]}>
           <Text style={styles.inputLabel}>
             Subtasks ({editSubtasks.length})
           </Text>
 
-          {/* List of subtasks */}
-          {editSubtasks.map(subtask => (
-            <View key={subtask.id} style={styles.subtaskItem}>
-              <Text style={styles.subtaskText}>{subtask.title}</Text>
-              {!isAlreadyCreated && (
-                <TouchableOpacity onPress={() => removeSubtask(subtask.id)}>
-                  <Text style={styles.subtaskRemove}>✕</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          ))}
+          {/* Draggable list of subtasks */}
+          {!isAlreadyCreated && editSubtasks.length > 0 ? (
+            <GestureHandlerRootView
+              style={{ overflow: 'visible', flexGrow: 0 }}
+            >
+              <DraggableFlatList
+                data={editSubtasks}
+                keyExtractor={item => item.id}
+                onDragEnd={({ data }) => setEditSubtasks(data)}
+                scrollEnabled={false}
+                style={{ overflow: 'visible', flexGrow: 0 }}
+                contentContainerStyle={{ flexGrow: 0 }}
+                renderItem={({
+                  item: subtask,
+                  drag,
+                  isActive,
+                }: RenderItemParams<ISubtask>) => (
+                  <ScaleDecorator>
+                    <TouchableOpacity
+                      onLongPress={drag}
+                      disabled={isActive}
+                      style={[
+                        styles.subtaskItem,
+                        isActive && styles.subtaskItemDragging,
+                      ]}
+                    >
+                      <TextInput
+                        style={[styles.subtaskText, styles.subtaskTextInput]}
+                        value={subtask.title}
+                        onChangeText={text => {
+                          setEditSubtasks(prev =>
+                            prev.map(s =>
+                              s.id === subtask.id ? { ...s, title: text } : s,
+                            ),
+                          );
+                        }}
+                        placeholder="Subtask..."
+                        placeholderTextColor="#999"
+                      />
+                      <View style={styles.subtaskActions}>
+                        <Text style={styles.dragHandle}>≡</Text>
+                        <TouchableOpacity
+                          onPress={() => removeSubtask(subtask.id)}
+                        >
+                          <Text style={styles.subtaskRemove}>✕</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </TouchableOpacity>
+                  </ScaleDecorator>
+                )}
+              />
+            </GestureHandlerRootView>
+          ) : (
+            // Read-only view for already created tasks
+            editSubtasks.map(subtask => (
+              <View key={subtask.id} style={styles.subtaskItem}>
+                <Text style={styles.subtaskText}>{subtask.title}</Text>
+              </View>
+            ))
+          )}
 
           {/* Add subtask input */}
           {!isAlreadyCreated && (
@@ -996,7 +1050,29 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
     fontSize: 14,
     fontWeight: 'bold',
-    paddingLeft: 10,
+    paddingLeft: 8,
+  },
+  subtaskTextInput: {
+    padding: 4,
+    margin: 0,
+  },
+  subtaskActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  subtaskItemDragging: {
+    backgroundColor: 'rgba(0, 122, 255, 0.15)',
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  dragHandle: {
+    fontSize: 18,
+    color: '#666',
+    paddingHorizontal: 6,
   },
   addSubtaskRow: {
     flexDirection: 'row',
