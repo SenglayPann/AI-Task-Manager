@@ -7,7 +7,18 @@ import {
   SafeAreaView,
   Animated,
   ActivityIndicator,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
+
+// Enable LayoutAnimation on Android
+if (
+  Platform.OS === 'android' &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import { useNavigation } from '@react-navigation/native';
 import { useTasks } from '../context/TaskContext';
 import { GlassLayout, glassStyles } from '../components/GlassLayout';
@@ -147,34 +158,19 @@ export const DashboardScreen = () => {
 
   const flipCard = () => {
     const toValue = isFlipped ? 0 : 1;
-    const targetHeight = isFlipped ? 180 : Math.max(180, backCardHeight); // Front: 180, Back: dynamic
 
-    Animated.parallel([
-      Animated.spring(flipAnim, {
-        toValue,
-        friction: 8,
-        tension: 10,
-        useNativeDriver: true,
-      }),
-      Animated.timing(heightAnim, {
-        toValue: targetHeight,
-        duration: 300,
-        useNativeDriver: false, // Height can't use native driver
-      }),
-    ]).start();
+    // Animate the height change with spring
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
+
+    // Animate the flip
+    Animated.timing(flipAnim, {
+      toValue,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+
     setIsFlipped(!isFlipped);
   };
-
-  // Animate height when backCardHeight changes (after advice loads)
-  useEffect(() => {
-    if (isFlipped && backCardHeight > 180) {
-      Animated.timing(heightAnim, {
-        toValue: backCardHeight,
-        duration: 200,
-        useNativeDriver: false,
-      }).start();
-    }
-  }, [backCardHeight, isFlipped]);
 
   const generateAdvice = async () => {
     setIsLoadingAdvice(true);
@@ -235,10 +231,21 @@ ${
 
 Keep advice concise (max 4-5 sentences). Be encouraging and specific about WHICH tasks to tackle. Do not use markdown formatting or bullet points.`;
 
+      // sendMessage already has retry logic with key rotation built-in
       const response = await GeminiService.sendMessage(prompt, tasks, []);
-      setAdvice(response.text);
+
+      // If response indicates rate limiting or error, show it
+      if (
+        response.text.includes('high traffic') ||
+        response.text.includes('error processing')
+      ) {
+        setAdvice(response.text);
+      } else {
+        setAdvice(response.text);
+      }
     } catch (error) {
-      setAdvice('Unable to get advice right now. Try again later!');
+      console.error('Advice generation error:', error);
+      setAdvice('Unable to get advice right now. Please try again later!');
     } finally {
       setIsLoadingAdvice(false);
     }
@@ -267,10 +274,10 @@ Keep advice concise (max 4-5 sentences). Be encouraging and specific about WHICH
   });
 
   const frontAnimatedStyle = {
-    transform: [{ rotateY: frontInterpolate }],
+    transform: [{ perspective: 1000 }, { rotateY: frontInterpolate }],
   };
   const backAnimatedStyle = {
-    transform: [{ rotateY: backInterpolate }],
+    transform: [{ perspective: 1000 }, { rotateY: backInterpolate }],
   };
 
   return (
@@ -289,8 +296,11 @@ Keep advice concise (max 4-5 sentences). Be encouraging and specific about WHICH
           </View>
 
           {/* Task Health Card - Flip Card */}
-          <Animated.View
-            style={[styles.flipCardContainer, { height: heightAnim }]}
+          <View
+            style={[
+              styles.flipCardContainer,
+              { minHeight: isFlipped ? backCardHeight : 180 },
+            ]}
           >
             {/* Front Side - Health Display */}
             <Animated.View
@@ -299,7 +309,9 @@ Keep advice concise (max 4-5 sentences). Be encouraging and specific about WHICH
                 styles.healthCard,
                 styles.flipCardFace,
                 frontAnimatedStyle,
+                { zIndex: isFlipped ? 0 : 1 },
               ]}
+              pointerEvents={isFlipped ? 'none' : 'auto'}
             >
               <View style={styles.healthContent}>
                 <View style={styles.healthLeft}>
@@ -356,44 +368,54 @@ Keep advice concise (max 4-5 sentences). Be encouraging and specific about WHICH
                 styles.flipCardFace,
                 styles.flipCardBack,
                 backAnimatedStyle,
+                { zIndex: isFlipped ? 1 : 0 },
               ]}
-              onLayout={event => {
-                const { height } = event.nativeEvent.layout;
-                if (height > 0 && height !== backCardHeight) {
-                  setBackCardHeight(height);
-                }
-              }}
+              pointerEvents={isFlipped ? 'auto' : 'none'}
             >
-              <View style={styles.adviceHeader}>
-                <Text style={styles.adviceTitle}>💡 AI Coach Advice</Text>
-              </View>
-              <View style={styles.adviceContent}>
-                {isLoadingAdvice ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="small" color="#007AFF" />
-                    <Text style={styles.loadingText}>Generating advice...</Text>
-                  </View>
-                ) : (
-                  <Text style={styles.adviceText}>{advice}</Text>
-                )}
-              </View>
-              <View style={styles.adviceButtonRow}>
+              <View
+                style={{ flex: 1 }}
+                onLayout={event => {
+                  const { height } = event.nativeEvent.layout;
+                  if (height > 0 && height !== backCardHeight) {
+                    setBackCardHeight(height + 24); // Add padding for card
+                  }
+                }}
+              >
+                <View style={styles.adviceHeader}>
+                  <Text style={styles.adviceTitle}>💡 AI Coach Advice</Text>
+                  <TouchableOpacity
+                    style={styles.refreshButton}
+                    onPress={async () => {
+                      if (!isLoadingAdvice) {
+                        await generateAdvice();
+                      }
+                    }}
+                    disabled={isLoadingAdvice}
+                  >
+                    <Text style={styles.refreshButtonText}>🔄</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.adviceContent}>
+                  {isLoadingAdvice ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="small" color="#007AFF" />
+                      <Text style={styles.loadingText}>
+                        Generating advice...
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.adviceText}>{advice}</Text>
+                  )}
+                </View>
                 <TouchableOpacity
                   style={[styles.getAdviceButton, styles.flipBackButton]}
                   onPress={handleGetAdvice}
                 >
-                  <Text style={styles.getAdviceText}>← Back</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.getAdviceButton, styles.refreshButton]}
-                  onPress={generateAdvice}
-                  disabled={isLoadingAdvice}
-                >
-                  <Text style={styles.getAdviceText}>🔄 Refresh</Text>
+                  <Text style={styles.getAdviceText}>← Back to Health</Text>
                 </TouchableOpacity>
               </View>
             </Animated.View>
-          </Animated.View>
+          </View>
 
           {/* Statistics Cards */}
           <View style={styles.statsContainer}>
@@ -712,13 +734,13 @@ const styles = StyleSheet.create({
   },
   // Flip Card Styles
   flipCardContainer: {
-    height: 200,
     marginBottom: 15,
+    minHeight: 180, // Minimum height to prevent collapse
   },
   flipCardFace: {
     position: 'absolute',
     width: '100%',
-    height: '100%',
+    minHeight: 180, // Ensure cards have minimum height
     backfaceVisibility: 'hidden',
   },
   flipCardBack: {
@@ -734,16 +756,6 @@ const styles = StyleSheet.create({
   },
   flipBackButton: {
     backgroundColor: 'rgba(100, 100, 100, 0.1)',
-    flex: 1,
-  },
-  refreshButton: {
-    backgroundColor: 'rgba(0, 122, 255, 0.1)',
-    flex: 1,
-  },
-  adviceButtonRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 12,
   },
   getAdviceText: {
     color: '#007AFF',
@@ -751,12 +763,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   adviceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 12,
   },
   adviceTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
+  },
+  refreshButton: {
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+  },
+  refreshButtonText: {
+    fontSize: 18,
   },
   adviceContent: {
     flex: 1,

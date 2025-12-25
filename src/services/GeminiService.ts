@@ -153,7 +153,7 @@ User Message: ${userMessage}
 `;
 
         const response = await genAI.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: getCurrentModel(),
           contents: prompt,
         });
         
