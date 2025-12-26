@@ -33,6 +33,7 @@ const buildSystemInstruction = (userProfile?: IUserProfile | null) => {
     if (userProfile.gender) parts.push(`Gender: ${userProfile.gender}.`);
     if (userProfile.career) parts.push(`They work as a ${userProfile.career}.`);
     if (userProfile.nationality) parts.push(`Nationality: ${userProfile.nationality}.`);
+    if (userProfile.selfDescription) parts.push(`About themselves: "${userProfile.selfDescription}"`);
     userContext = parts.length > 0 ? `\nUser Profile:\n${parts.join(' ')}\nALWAYS use this personal information to personalize your responses and make the experience relevant to the user.\n` : '';
   }
 

@@ -398,6 +398,8 @@ export const TaskDetailScreen = () => {
                         }}
                         placeholder="Subtask..."
                         placeholderTextColor="#999"
+                        multiline
+                        textAlignVertical="top"
                       />
                       <View style={styles.subtaskActions}>
                         <Text style={styles.dragHandle}>≡</Text>
@@ -618,11 +620,12 @@ const styles = StyleSheet.create({
   },
   subtaskItem: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 8,
     backgroundColor: 'rgba(255,255,255,0.4)',
     padding: 10,
     borderRadius: 8,
+    minHeight: 44,
   },
   subtaskCheck: {
     fontSize: 18,

@@ -43,6 +43,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
   const [currentPage, setCurrentPage] = useState(0);
   const [isCreating, setIsCreating] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
+  const [isGeneratingSubtasks, setIsGeneratingSubtasks] = useState(false);
 
   // Local editable state for pending task
   const [editTitle, setEditTitle] = useState('');
@@ -123,6 +124,28 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
         console.error('Failed to enhance task:', error);
       } finally {
         setIsEnhancing(false);
+      }
+    };
+
+    const handleGenerateSubtasks = async () => {
+      if (isGeneratingSubtasks || isAlreadyCreated) return;
+      if (!editTitle.trim()) return;
+
+      setIsGeneratingSubtasks(true);
+      try {
+        const subtaskTitles = await GeminiService.generateSubtasks(
+          editTitle.trim(),
+        );
+        const newSubtasks: ISubtask[] = subtaskTitles.map((title, index) => ({
+          id: `ai-subtask-${Date.now()}-${index}`,
+          title,
+          isCompleted: false,
+        }));
+        setEditSubtasks([...editSubtasks, ...newSubtasks]);
+      } catch (error) {
+        console.error('Failed to generate subtasks:', error);
+      } finally {
+        setIsGeneratingSubtasks(false);
       }
     };
 
@@ -435,6 +458,20 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
           >
             <Text style={styles.enhanceButtonText}>
               {isEnhancing ? '⏳ Enhancing...' : '✨ Enhance'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.suggestSubtasksButton,
+              (isGeneratingSubtasks || isAlreadyCreated || !hasTitle) &&
+                styles.enhanceButtonDisabled,
+            ]}
+            onPress={handleGenerateSubtasks}
+            disabled={isGeneratingSubtasks || isAlreadyCreated || !hasTitle}
+          >
+            <Text style={styles.suggestSubtasksButtonText}>
+              {isGeneratingSubtasks ? '⏳ Generating...' : '🤖 AI Subtasks'}
             </Text>
           </TouchableOpacity>
 
@@ -877,7 +914,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 8,
     alignItems: 'center',
-    flex: 1,
   },
   createButtonDisabled: {
     backgroundColor: '#a8e6b5',
@@ -888,8 +924,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   pendingButtonRow: {
-    flexDirection: 'row',
-    gap: 10,
+    flexDirection: 'column',
+    gap: 8,
     marginTop: 12,
   },
   enhanceButton: {
@@ -898,12 +934,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 8,
     alignItems: 'center',
-    flex: 1,
   },
   enhanceButtonDisabled: {
     backgroundColor: '#a0c4e8',
   },
   enhanceButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  suggestSubtasksButton: {
+    backgroundColor: '#8B5CF6',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  suggestSubtasksButtonText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: 'bold',
@@ -1035,11 +1082,12 @@ const styles = StyleSheet.create({
   subtaskItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     backgroundColor: '#f8f9fa',
     padding: 8,
     borderRadius: 6,
     marginTop: 6,
+    minHeight: 36,
   },
   subtaskText: {
     fontSize: 13,
