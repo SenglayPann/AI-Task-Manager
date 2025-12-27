@@ -14,7 +14,7 @@ const rootReducer = combineReducers({
 const persistConfig = {
   key: 'root',
   storage: AsyncStorage,
-  whitelist: ['user', 'tasks', 'chat'], // persist user profile
+  whitelist: [], // persist user profile
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

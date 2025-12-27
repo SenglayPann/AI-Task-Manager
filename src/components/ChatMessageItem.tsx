@@ -382,9 +382,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                   isActive,
                 }: RenderItemParams<ISubtask>) => (
                   <ScaleDecorator>
-                    <TouchableOpacity
-                      onLongPress={drag}
-                      disabled={isActive}
+                    <View
                       style={[
                         styles.subtaskItem,
                         isActive && styles.subtaskItemDragging,
@@ -402,16 +400,25 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                         }}
                         placeholder="Subtask..."
                         placeholderTextColor="#999"
+                        multiline
+                        textAlignVertical="top"
                       />
                       <View style={styles.subtaskActions}>
-                        <Text style={styles.dragHandle}>≡</Text>
+                        <TouchableOpacity
+                          onLongPress={drag}
+                          onPressIn={drag}
+                          disabled={isActive}
+                          delayLongPress={100}
+                        >
+                          <Text style={styles.dragHandle}>≡</Text>
+                        </TouchableOpacity>
                         <TouchableOpacity
                           onPress={() => removeSubtask(subtask.id)}
                         >
                           <Text style={styles.subtaskRemove}>✕</Text>
                         </TouchableOpacity>
                       </View>
-                    </TouchableOpacity>
+                    </View>
                   </ScaleDecorator>
                 )}
               />
@@ -1078,27 +1085,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Subtask Styles
+  // Subtask Styles (matching TaskDetailScreen)
   subtaskItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
-    backgroundColor: '#f8f9fa',
-    padding: 8,
-    borderRadius: 6,
-    marginTop: 6,
-    minHeight: 36,
+    marginBottom: 8,
+    backgroundColor: 'rgba(255,255,255,0.4)',
+    padding: 10,
+    borderRadius: 8,
+    minHeight: 44,
   },
   subtaskText: {
-    fontSize: 13,
+    fontSize: 16,
     color: '#333',
     flex: 1,
   },
   subtaskRemove: {
+    fontSize: 18,
     color: '#FF3B30',
-    fontSize: 14,
-    fontWeight: 'bold',
-    paddingLeft: 8,
+    padding: 5,
   },
   subtaskTextInput: {
     padding: 4,
@@ -1107,7 +1112,7 @@ const styles = StyleSheet.create({
   subtaskActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 8,
   },
   subtaskItemDragging: {
     backgroundColor: 'rgba(0, 122, 255, 0.15)',

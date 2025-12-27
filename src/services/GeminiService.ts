@@ -1,9 +1,11 @@
 import { GoogleGenAI } from '@google/genai';
-import { GEMINI_API_KEY, GEMINI_API_KEY_2, GEMINI_API_KEY_3 } from '@env';
+import { GEMINI_API_KEY, GEMINI_API_KEY_2, GEMINI_API_KEY_3, GEMINI_API_KEY_Pro, GEMINI_API_KEY_Pro2, GEMINI_API_KEY_Pro3 } from '@env';
 import { ITask, AIChatAction, AIChatMessage } from '../types/task';
 import { IUserProfile } from '../types/userProfile';
 
-const API_KEYS = [GEMINI_API_KEY, GEMINI_API_KEY_2, GEMINI_API_KEY_3].filter(Boolean);
+const apiKeyType: string = "Pro";
+
+const API_KEYS = apiKeyType === "Dev" ? [GEMINI_API_KEY, GEMINI_API_KEY_2, GEMINI_API_KEY_3].filter(Boolean) : [GEMINI_API_KEY_Pro, GEMINI_API_KEY_Pro2, GEMINI_API_KEY_Pro3].filter(Boolean);
 const MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-flash']; // Alternate models per key
 let currentKeyIndex = 0;
 
@@ -65,17 +67,31 @@ Context Awareness:
 
 Smart Date/Time Parsing:
 - When the user mentions time-related words, ALWAYS parse them into ISO 8601 format for dueDate.
-- Examples (assuming today is ${now.toLocaleDateString()}):
+- The format MUST be: YYYY-MM-DDTHH:mm:ss.sssZ (e.g., "2024-12-26T14:00:00.000Z")
+- Time of Day Keywords:
+  - "morning" → 09:00
+  - "noon" / "midday" → 12:00
+  - "afternoon" → 14:00
+  - "evening" → 18:00
+  - "night" → 21:00
+  - "end of day" → 17:00
+- Examples (assuming today is ${now.toLocaleDateString()}, current time is ${now.toLocaleTimeString()}):
   - "tomorrow" → next day at 09:00
+  - "tomorrow morning" → next day at 09:00
+  - "tomorrow afternoon" → next day at 14:00
   - "tomorrow at 3pm" → next day at 15:00
+  - "next day morning" → next day at 09:00
   - "next Monday" → the next Monday at 09:00
-  - "in 2 hours" → current time + 2 hours
-  - "this evening" → today at 18:00
   - "next week" → 7 days from now at 09:00
+  - "next week afternoon" → 7 days from now at 14:00
+  - "today at 1 pm" → today at 13:00
+  - "today evening" → today at 18:00
+  - "this evening" → today at 18:00
+  - "in 2 hours" → current time + 2 hours
   - "Friday at 2pm" → this coming Friday at 14:00
-  - "end of day" → today at 17:00
+  - "Saturday morning" → this coming Saturday at 09:00
 - If the user doesn't specify a time, use 09:00 as the default time.
-- ALWAYS include the parsed date in the pendingTask.dueDate field.
+- ALWAYS include the parsed date in the pendingTask.dueDate field in full ISO 8601 format.
 
 Profile-Based Description Suggestions:
 - Use the user's profile (career, age, name) to suggest relevant, personalized task descriptions.

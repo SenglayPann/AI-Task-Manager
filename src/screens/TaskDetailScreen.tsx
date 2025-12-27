@@ -369,9 +369,7 @@ export const TaskDetailScreen = () => {
                   isActive,
                 }: RenderItemParams<ISubtask>) => (
                   <ScaleDecorator>
-                    <TouchableOpacity
-                      onLongPress={drag}
-                      disabled={isActive}
+                    <View
                       style={[
                         styles.subtaskItem,
                         isActive && styles.subtaskItemDragging,
@@ -402,12 +400,19 @@ export const TaskDetailScreen = () => {
                         textAlignVertical="top"
                       />
                       <View style={styles.subtaskActions}>
-                        <Text style={styles.dragHandle}>≡</Text>
+                        <TouchableOpacity
+                          onLongPress={drag}
+                          onPressIn={drag}
+                          disabled={isActive}
+                          delayLongPress={100}
+                        >
+                          <Text style={styles.dragHandle}>≡</Text>
+                        </TouchableOpacity>
                         <TouchableOpacity onPress={() => deleteSubtask(s.id)}>
                           <Text style={styles.deleteSubtask}>✕</Text>
                         </TouchableOpacity>
                       </View>
-                    </TouchableOpacity>
+                    </View>
                   </ScaleDecorator>
                 )}
               />
